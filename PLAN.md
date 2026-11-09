@@ -24,7 +24,7 @@ Plain TypeScript with direct API calls, on Node 24, ESM. Versions were checked o
 
 | Package | Version | Why | Note |
 |---|---|---|---|
-| `typescript` | 7.0.2 | Type-checking and build (`tsc`) | Released 8 Jul |
+| `typescript` | 6.0.3 | Type-checking and build (`tsc`) | Not 7.x: the SurrealDB SDK supports TypeScript 5 or 6 only. An internal SDK helper lists only 5, and npm overrides that safely, since it affects types only |
 | `tsx` | 4.23.15 | Runs TypeScript in development | |
 | `vitest` | 4.1.12 | Tests | 5.1.0 is from 2 Nov, too new |
 | `@types/node` | 24.19.2 | Types matching Node 24 | Not 26.x, which is for Node 26 |
@@ -75,7 +75,8 @@ src/
     money.ts            USDC amounts as integer micro-units
     names.ts            project names valid for both Discord and GitHub
   discord/
-    client.ts           intents, login, event handlers
+    client.ts           intents, login, the interaction handler, safeRecord()
+    command.ts          the Command and BotContext types
     register.ts         registers slash commands on our server (npm run commands:register)
     guards.ts           owner-only, project-channel-only, stage checks
     invites.ts          invite cache and join tracking
@@ -88,6 +89,7 @@ src/
     tavily.ts           search
   prompts/              prompt text, each with a version name
 test/
+  helpers/db.ts         memoryDb(): in-memory SurrealDB 4 with the real schema
   fixtures/             recorded payloads, with anything private removed
 scripts/
   check-env.mjs         tests every service without printing values
@@ -110,7 +112,7 @@ SurrealDB 4 on SurrealDB Cloud (Earth): namespace `freelance`, database `bot`. E
 
 **Rules:**
 - **Money is stored as integers in micro-USDC.** USDC has 6 decimals, so 250 USDC is `250000000`. Never use floats for money.
-- **Events are append-only.** The bot only ever creates them. Table permissions don't bind system users like ours, so the schema also adds an event that throws on update or delete. Phase 1 has a test that this really blocks a change. If it doesn't, the code rule stands alone, and we note that in `surreal-data`.
+- **History is append-only:** `event`, `spec`, `quote`, `agreement` and `payment`. The bot only ever creates these records. Table permissions don't bind system users like ours, so each history table has an event that throws on update or delete. **Proven on 9 Nov,** both in memory and on the cloud server: `UPDATE`, `UPSERT` and `DELETE` are refused, and the record is left unchanged.
 - **A stage change and its event are written in one transaction,** through one function in `db/projects.ts`.
 - **Touches are events where the actor is the owner.** They don't need a table of their own.
 
@@ -268,7 +270,6 @@ This aims at the Best Use of Memory prize: Boran repeats less and touches less b
 
 ## Open questions
 
-- **SurrealDB:** does a `THROW` inside a table event block the update or delete? Tested in phase 1.
 - **Tessl:**
   - Does an issue created with the label already on it start a run? The plan adds the label in a second call to be safe.
   - What does a typical run cost?

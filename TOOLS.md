@@ -28,7 +28,7 @@ All live in `.claude/skills/`. Vendor skills are recorded in `skills-lock.json`.
 | Skill | Covers | Status |
 |---|---|---|
 | `typescript-node` | Code style, the long-running process, API limits, money rules, audit logging, tests | Written |
-| `surreal-data` | Our schema, the append-only event log, queries | To write in phase 1 |
+| `surreal-data` | Our schema, append-only history, connecting to SurrealDB 4, queries, tests | Written |
 | `discord-bot` | discord.js conventions: commands, permissions, buttons, deferring slow replies, invite tracking | To write in phase 2 |
 
 **Tessl**
@@ -75,6 +75,13 @@ Exact versions, and why each was chosen, are in `PLAN.md` under "Stack and versi
 There are two deliberate exceptions, both for SurrealDB 4:
 - `surrealdb` 2.2.2;
 - `@surrealdb/node` 3.2.0.
+
+TypeScript is 6.0.3, not 7, because the SurrealDB SDK supports only 5 and 6.
+
+**Install scripts:** npm 11 holds back install scripts it hasn't been told about. Three are denied in `package.json` under `allowScripts`, because nothing needs them. `tsx`, `vitest` and `tsc` all work without them:
+- `@google/genai`: a no-op echo;
+- `esbuild`: an optional speed-up;
+- `protobufjs`: a version check.
 
 ## Services and keys
 

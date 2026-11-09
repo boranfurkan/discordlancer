@@ -22,28 +22,28 @@ Each phase ends with `npx tsc --noEmit`, `npx vitest run` and a check in our Dis
 
 Skills: `typescript-node`, `surrealdb-js`, `surrealql`. Context7 for discord.js 14.
 
-- [ ] `package.json`:
+- [x] `package.json`:
   - ESM;
   - Node 24 in `engines`;
   - scripts: `dev`, `build`, `start`, `test`, `typecheck`, `db:migrate`, `commands:register`, `check:env`.
-- [ ] Install the exact versions in `PLAN.md`, and commit `package-lock.json`.
-- [ ] `tsconfig.json`: `strict` and `noUncheckedIndexedAccess`, `module` `nodenext`, output to `dist/`.
-- [ ] `src/env.ts`: Zod, using the names in `.env.example`. A missing variable is reported by name only.
-- [ ] `src/log.ts`: JSON lines to stdout, with secrets scrubbed.
-- [ ] `src/db/client.ts`: WebSocket connection, sign in, use `freelance`/`bot`, reconnect.
-- [ ] `src/db/schema.surql` and `npm run db:migrate`:
+- [x] Install the exact versions in `PLAN.md`, and commit `package-lock.json`. TypeScript became 6.0.3 (see `PLAN.md`).
+- [x] `tsconfig.json`: `strict` and `noUncheckedIndexedAccess`, `module` `nodenext`, output to `dist/`.
+- [x] `src/env.ts`: Zod, using the names in `.env.example`. A missing variable is reported by name only.
+- [x] `src/log.ts`: JSON lines to stdout, with secrets scrubbed.
+- [x] `src/db/client.ts`: WebSocket connection, sign in, use `freelance`/`bot`, reconnect.
+- [x] `src/db/schema.surql` and `npm run db:migrate`:
   - tables, fields and unique indexes from `PLAN.md`;
-  - the append-only guard on `event`.
-- [ ] `src/db/events.ts`: `recordEvent()`.
-- [ ] `src/domain/stages.ts`, `money.ts` and `names.ts`, with unit tests.
-- [ ] `src/discord/client.ts` with the four intents, `register.ts` for server commands, and `/help`.
-- [ ] Tests:
+  - the append-only guard on `event`, and on the other history tables.
+- [x] `src/db/events.ts`: `recordEvent()`.
+- [x] `src/domain/stages.ts`, `money.ts` and `names.ts`, with unit tests.
+- [x] `src/discord/client.ts` with the four intents, `register.ts` for server commands, and `/help`.
+- [x] Tests:
   - the append-only guard, against an in-memory database (`@surrealdb/node`);
   - stage rules;
   - money parsing (micro-USDC, never floats);
   - name rules;
   - secret scrubbing.
-- [ ] Write the `surreal-data` skill: our schema, the event log, transactions, and what the append-only test showed.
+- [x] Write the `surreal-data` skill: our schema, the event log, transactions, and what the append-only test showed.
 
 **Done when:**
 - the bot shows online in the server;
@@ -51,6 +51,8 @@ Skills: `typescript-node`, `surrealdb-js`, `surrealql`. Context7 for discord.js 
 - the `/help` use appears as an event in SurrealDB;
 - an update or delete on `event` is refused, or the gap is recorded;
 - all tests pass.
+
+**Met on 9 Nov.** Boran's `/help` was recorded as `owner command.help ok`, and the guard was proven on the cloud server.
 
 ### Phase 2: Project start (target Tue 10 Nov)
 
