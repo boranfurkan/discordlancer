@@ -13,7 +13,8 @@ Freeze: **Wed 18 Nov, 6pm.** The client comes first, so bot work fits around the
 5. [ ] **Real-person check, about 2 minutes, when Ahmet Bey has time.** Run `/new-project dl-test-one` and send him only that invite. Check that only `#dl-test-one` opens, with the welcome and the Client role, and that `/help` and `/project` work for him. Everything else is covered by the automated journey test (`test/e2e/journey.test.ts`).
    - [ ] **Later, Boran:** a real 0.01 USDC payment through `/pay` with Phantom, to confirm Phantom includes the reference.
 6. [x] **Review the default quote terms** in `src/discord/texts.ts` (`quoteTerms`).
-7. [ ] **Deploy to Replit:** follow `DEPLOY.md`, and stop the copy on the Mac first. Redeem the Pro coupon (`replit.com/~?redeemCoupon=[code removed]`).
+7. [x] **Deployed to Replit (9 Nov):** a Reserved VM, live at the status page https://discordlancer.replit.app. Don't run a copy on the Mac any more. Updates: push, `git pull` in Replit, Republish (`DEPLOY.md`).
+   - [x] Fresh reset after deploying (9 Nov, 17:09): empty database, empty `#owner-desk`, no invites; backup in `backups/`.
 8. [ ] **Hackathon admin:**
    - [x] the organisers know you're solo;
    - [ ] declare your Solana receiving wallet to them before the first payment.
