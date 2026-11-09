@@ -16,6 +16,7 @@ import { startPaymentWatcher } from './discord/watcher.js';
 import { startPullRequestWatcher } from './discord/prWatcher.js';
 import { registerCommands } from './discord/register.js';
 import { loadEnv, secretValues } from './env.js';
+import { healthPort, startHealthServer } from './health.js';
 import { log, registerSecrets } from './log.js';
 
 process.on('unhandledRejection', (reason) => {
@@ -31,11 +32,14 @@ async function main(): Promise<void> {
   const env = loadEnv();
   registerSecrets(secretValues(env));
 
+  // Opened first, so the host sees the app is up while the rest starts.
+  const client = createDiscordClient();
+  const health = startHealthServer(healthPort(process.env.PORT), () => client.isReady());
+
   const db = await connectDatabase(env);
   await applySchema(db);
   await registerCommands(env, COMMANDS);
 
-  const client = createDiscordClient();
   let stopWatcher: (() => void) | undefined;
   let stopPullWatcher: (() => void) | undefined;
   const ctx = {
@@ -67,6 +71,7 @@ async function main(): Promise<void> {
     log.info('shutting down', { signal });
     stopWatcher?.();
     stopPullWatcher?.();
+    health.close();
     await client.destroy();
     await closeDatabase(db);
     process.exit(0);

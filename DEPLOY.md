@@ -18,10 +18,23 @@ The bot runs as one always-on process. Replit's **Reserved VM** keeps it on. Aut
    npm run check:env
    ```
    It should print `23 passed` once the two morning fixes are done. It says "no .env file" on Replit, which is expected.
-5. **Publish as a Reserved VM.** In Replit's Publishing pane, choose **Reserved VM**, the smallest machine size, and:
-   - **Build command:** `npm ci && npm run build`
-   - **Run command:** `npm start`
-   - **check:** exactly one instance. Reserved VM is a single machine by design.
+5. **Publish as a Reserved VM.**
+   - **Machine:** in **Publish → Adjust settings**, choose **Reserved VM** and the smallest machine size. Reserved VM is one machine, so only one copy of the bot runs.
+   - **Commands go in the hidden `.replit` file,** not the publish screen (learned 9 Nov). To see it: Files → ⋮ → **Show hidden files**. Add:
+     ```toml
+     [deployment]
+     build = "npm ci && npm run build"
+     run = "npm start"
+
+     [[ports]]
+     localPort = 8080
+     externalPort = 80
+     ```
+     Keep the `deploymentTarget` line Replit adds.
+   - **No top-level `run = …` line.** It drives the editor's green Run button, which would start a second copy of the bot.
+   - **The status page:** Replit only finishes publishing once a web page answers. The bot serves a tiny status page on `$PORT` or 8080, saying only `ok` and whether Discord is connected. Without it, publishing fails at **Promote** after about 10 minutes. `ignorePorts = true` didn't prevent that.
+   - **Don't use "Fix with Agent"** or Replit's Agent: it changes code.
+   - **To update the bot later:** push to GitHub, run `git pull` in the Replit Shell (or use the Git pane), then **Republish**.
 6. **Check it's live.**
    - The deployment logs show `database connected`, `commands registered` and `discord ready`.
    - In Discord, `/help` answers with your laptop closed.
