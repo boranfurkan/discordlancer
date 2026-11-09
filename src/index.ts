@@ -5,6 +5,8 @@ import { closeDatabase, connectDatabase } from './db/client.js';
 import { applySchema } from './db/migrate.js';
 import { createDiscordClient, handleInteractions, safeRecord } from './discord/client.js';
 import { COMMANDS } from './discord/commands/index.js';
+import { onMemberAdd } from './discord/joins.js';
+import { createGitHub } from './services/github.js';
 import { registerCommands } from './discord/register.js';
 import { loadEnv, secretValues } from './env.js';
 import { log, registerSecrets } from './log.js';
@@ -27,13 +29,16 @@ async function main(): Promise<void> {
   await registerCommands(env, COMMANDS);
 
   const client = createDiscordClient();
-  const ctx = { env, db, commands: COMMANDS };
+  const ctx = { env, db, github: createGitHub(env), commands: COMMANDS };
 
   client.once(Events.ClientReady, (ready) => {
     log.info('discord ready', { user: ready.user.tag, guild: env.DISCORD_GUILD_ID });
     void safeRecord(ctx, { actor: 'bot', action: 'bot.started', outcome: 'ok' });
   });
   handleInteractions(client, ctx);
+  client.on(Events.GuildMemberAdd, (member) => {
+    void onMemberAdd(member, ctx);
+  });
 
   const shutdown = async (signal: string) => {
     log.info('shutting down', { signal });

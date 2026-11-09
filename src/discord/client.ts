@@ -1,5 +1,5 @@
 // The Discord client and the interaction handler. One failed command never stops
-// the bot: the person gets a short, honest reply and the failure is recorded.
+// the bot: the person gets a short, honest reply and the outcome is recorded.
 
 import {
   Client,
@@ -10,9 +10,11 @@ import {
   type Interaction,
 } from 'discord.js';
 import { recordEvent, type EventInput } from '../db/events.js';
+import { getProjectByChannel, StageConflictError, type Project } from '../db/projects.js';
 import { log } from '../log.js';
-import type { BotContext } from './command.js';
+import { UserError, type BotContext, type Command } from './command.js';
 import { actorFor, checkAccess } from './guards.js';
+import { STAGE_LABEL } from './texts.js';
 
 export function createDiscordClient(): Client {
   return new Client({
@@ -20,7 +22,7 @@ export function createDiscordClient(): Client {
       GatewayIntentBits.Guilds,
       // Privileged: to see when a client joins.
       GatewayIntentBits.GuildMembers,
-      // To keep the invite cache current for join tracking.
+      // To be told about invites; join tracking itself reads them fresh from Discord.
       GatewayIntentBits.GuildInvites,
       // Privileged: so fetched messages include their text, for specs.
       GatewayIntentBits.MessageContent,
@@ -43,9 +45,12 @@ export async function safeRecord(ctx: Pick<BotContext, 'db'>, input: EventInput)
   }
 }
 
-async function safeReply(interaction: ChatInputCommandInteraction, content: string): Promise<void> {
+/** Replies privately, whatever state the interaction is in. */
+export async function safeReply(interaction: ChatInputCommandInteraction, content: string): Promise<void> {
   try {
-    if (interaction.replied || interaction.deferred) {
+    if (interaction.deferred && !interaction.replied) {
+      await interaction.editReply({ content });
+    } else if (interaction.replied) {
       await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
     } else {
       await interaction.reply({ content, flags: MessageFlags.Ephemeral });
@@ -55,39 +60,88 @@ async function safeReply(interaction: ChatInputCommandInteraction, content: stri
   }
 }
 
+export type Gate = { ok: true } | { ok: false; reason: string; reply: string };
+
+/** Pure: whether this person may run this command here, at this stage. */
+export function checkGate(
+  command: Pick<Command, 'access' | 'where' | 'stages'>,
+  userId: string,
+  ownerId: string,
+  project: Pick<Project, 'client_id' | 'stage'> | undefined,
+): Gate {
+  const access = checkAccess(command, userId, ownerId);
+  if (!access.ok) return { ok: false, reason: 'owner only', reply: access.reply };
+  if (command.where === 'project') {
+    if (!project) return { ok: false, reason: 'not a project channel', reply: 'This only works in a project channel.' };
+    if (userId !== ownerId && userId !== project.client_id) {
+      return { ok: false, reason: 'not their project', reply: "This isn't your project channel." };
+    }
+  }
+  if (command.stages && project && !command.stages.includes(project.stage)) {
+    return {
+      ok: false,
+      reason: `stage ${project.stage}`,
+      reply: `That can't be done at this stage (${STAGE_LABEL[project.stage]}). Try /project to see what's next.`,
+    };
+  }
+  return { ok: true };
+}
+
 async function onInteraction(interaction: Interaction, ctx: BotContext): Promise<void> {
   if (!interaction.isChatInputCommand()) return;
-  if (interaction.guildId !== ctx.env.DISCORD_GUILD_ID) return;
+  if (!interaction.inCachedGuild() || interaction.guildId !== ctx.env.DISCORD_GUILD_ID) return;
 
   const userId = interaction.user.id;
-  const base = {
-    actor: actorFor(userId, ctx.env.DISCORD_OWNER_ID),
+  const actor = actorFor(userId, ctx.env.DISCORD_OWNER_ID);
+  const action = `command.${interaction.commandName}`;
+  let project: Project | undefined;
+  let command: Command | undefined;
+  // Only project commands are filed under the channel's project. A command that works
+  // anywhere, like /new-project, may be about a different project altogether.
+  const event = (outcome: EventInput['outcome'], data: Record<string, unknown> = {}): EventInput => ({
+    actor,
     actorId: userId,
-    action: `command.${interaction.commandName}`,
-  } as const;
-  const data = { channel_id: interaction.channelId };
+    action,
+    outcome,
+    ...(project && command?.where === 'project' ? { project: project.id } : {}),
+    data: { channel_id: interaction.channelId, ...data },
+  });
 
-  const command = ctx.commands.find((candidate) => candidate.name === interaction.commandName);
-  if (!command) {
-    await safeReply(interaction, "I don't know that command any more. Try /help.");
-    await safeRecord(ctx, { ...base, outcome: 'refused', data: { ...data, reason: 'unknown command' } });
+  try {
+    project = await getProjectByChannel(ctx.db, interaction.channelId);
+  } catch (error) {
+    log.error('could not look up the project', { error });
+    await safeReply(interaction, 'Something went wrong on my side. It has been logged; please try again in a minute.');
+    await safeRecord(ctx, event('failed', { error: 'project lookup failed' }));
     return;
   }
 
-  const access = checkAccess(command, userId, ctx.env.DISCORD_OWNER_ID);
-  if (!access.ok) {
-    await safeReply(interaction, access.reply);
-    await safeRecord(ctx, { ...base, outcome: 'refused', data: { ...data, reason: 'owner only' } });
+  command = ctx.commands.find((candidate) => candidate.name === interaction.commandName);
+  if (!command) {
+    await safeReply(interaction, "I don't know that command any more. Try /help.");
+    await safeRecord(ctx, event('refused', { reason: 'unknown command' }));
+    return;
+  }
+
+  const gate = checkGate(command, userId, ctx.env.DISCORD_OWNER_ID, project);
+  if (!gate.ok) {
+    await safeReply(interaction, gate.reply);
+    await safeRecord(ctx, event('refused', { reason: gate.reason }));
     return;
   }
 
   try {
-    await command.execute(interaction, ctx);
-    await safeRecord(ctx, { ...base, outcome: 'ok', data });
+    await command.execute({ interaction, ctx, actor, project });
+    await safeRecord(ctx, event('ok'));
   } catch (error) {
+    if (error instanceof UserError || error instanceof StageConflictError) {
+      await safeReply(interaction, error.message);
+      await safeRecord(ctx, event('refused', { reason: error.message }));
+      return;
+    }
     log.error('command failed', { command: command.name, error });
     await safeReply(interaction, 'Something went wrong on my side. It has been logged; please try again in a minute.');
     const message = error instanceof Error ? error.message : String(error);
-    await safeRecord(ctx, { ...base, outcome: 'failed', data: { ...data, error: message } });
+    await safeRecord(ctx, event('failed', { error: message }));
   }
 }

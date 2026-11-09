@@ -208,6 +208,18 @@ if (githubOk) {
     fail(`unexpected HTTP ${res.status}: ${brief(res.body)}`);
   });
 
+  // A made-up username: GitHub checks permissions first (403), then the user (404).
+  // No invitation can be sent, because the user doesn't exist.
+  await check('GitHub', 'can add collaborators (Administration write)', async () => {
+    const res = await github(`${repo}/collaborators/dl-nonexistent-user-zq9x7`, {
+      method: 'PUT',
+      body: JSON.stringify({ permission: 'push' }),
+    });
+    if (res.status === 404 || res.status === 422) return 'allowed';
+    if (res.status === 403) fail('not allowed: set Administration to "Read and write" on the token (Repository permissions)');
+    fail(`unexpected HTTP ${res.status}: ${brief(res.body)}`);
+  });
+
   // An empty title is rejected with 422 after the permission check, so no issue is created.
   await check('GitHub', 'can open issues (Issues)', async () => {
     const res = await github(`${repo}/issues`, { method: 'POST', body: JSON.stringify({ title: '' }) });
