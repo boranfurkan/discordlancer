@@ -13,6 +13,7 @@ import { createGitHub } from './services/github.js';
 import { createMemory } from './services/memory.js';
 import { createSolana } from './services/solana.js';
 import { startPaymentWatcher } from './discord/watcher.js';
+import { startPullRequestWatcher } from './discord/prWatcher.js';
 import { registerCommands } from './discord/register.js';
 import { loadEnv, secretValues } from './env.js';
 import { log, registerSecrets } from './log.js';
@@ -36,6 +37,7 @@ async function main(): Promise<void> {
 
   const client = createDiscordClient();
   let stopWatcher: (() => void) | undefined;
+  let stopPullWatcher: (() => void) | undefined;
   const ctx = {
     env,
     db,
@@ -50,6 +52,7 @@ async function main(): Promise<void> {
     log.info('discord ready', { user: ready.user.tag, guild: env.DISCORD_GUILD_ID });
     void safeRecord(ctx, { actor: 'bot', action: 'bot.started', outcome: 'ok' });
     stopWatcher = startPaymentWatcher(client, ctx);
+    stopPullWatcher = startPullRequestWatcher(client, ctx);
   });
   handleInteractions(client, ctx, {
     [CONFIRM_DELIVERY_BUTTON]: onConfirmDeliveryButton,
@@ -63,6 +66,7 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string) => {
     log.info('shutting down', { signal });
     stopWatcher?.();
+    stopPullWatcher?.();
     await client.destroy();
     await closeDatabase(db);
     process.exit(0);

@@ -148,7 +148,7 @@ Commands are registered on our server only, so changes appear instantly. Every c
 | `/new-project name` | Boran | 2 | Creates the private channel, a single-use invite and a private repo with the same name. Replies privately with the invite link |
 | `/link-client user` | Boran | 2 | Fallback: attaches a member to the project if invite tracking missed them |
 | `/project` | Both | 2 | Project card: stage, spec version, quote, payment, deadline, what's next |
-| `/add-github username` | Both | 2 | Adds the client's GitHub account to the repo with write access |
+| `/add-github username` | Both | 2 | Adds the client's GitHub account to the repo with **read-only** access |
 | `/create-specs` | Boran | 4 | Gemini writes spec version N from the whole channel, plus "what changed since N-1" and open questions. Posted as a `.md` file and pinned (the bot needs the Pin Messages permission) |
 | `/agree-specs` | Both | 4 | Agrees to the current spec version. Needs both people |
 | `/quote amount deadline` | Boran | 4 | Quote version N, in USDC, tied to the agreed spec version, with short terms |
@@ -223,7 +223,7 @@ Based on the `gemini-api-dev` skill. Fetch its docs page for the interactions AP
 3. Boran approves with a button.
 4. The bot opens a GitHub issue with a clear task, creates the `tessl` label if the repo lacks it, then adds the label in a second call.
 5. Tessl opens a pull request on a `tessl/` branch, usually within about 90 seconds of the label.
-6. Boran reviews and merges it. The bot posts the outcome.
+6. The bot posts the pull request in the channel, with a review reminder in `owner-desk`. Boran reviews and merges it, and the bot posts that it's merged (or closed). The pull request is found by Tessl's branch name, `tessl/issue-<n>`, or its title, `#<n>: …`, checked every minute.
 
 **Setup per client repo:** turn the factory on in the Tessl web app at delivery. It can't be scripted. Once, install the Tessl GitHub App on `boranfurkan` with All repositories.
 

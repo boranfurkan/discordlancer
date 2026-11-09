@@ -17,11 +17,12 @@ import { CONFIRM_DELIVERY_BUTTON, onConfirmDeliveryButton } from '../../src/disc
 import { COMMANDS } from '../../src/discord/commands/index.js';
 import { onMemberAdd } from '../../src/discord/joins.js';
 import { checkRequest } from '../../src/discord/watcher.js';
+import { checkChangeRequest } from '../../src/discord/prWatcher.js';
 import type { Env } from '../../src/env.js';
 import { STATUS_SYSTEM, TRIAGE_SYSTEM } from '../../src/prompts/after-delivery.js';
 import { SPEC_SYSTEM } from '../../src/prompts/specs.js';
 import type { GeminiApi, JsonRequest } from '../../src/services/gemini.js';
-import type { GitHubApi } from '../../src/services/github.js';
+import type { GitHubApi, PullInfo } from '../../src/services/github.js';
 import type { MemoryApi } from '../../src/services/memory.js';
 import { newReference, type SolanaApi } from '../../src/services/solana.js';
 import { memoryDb } from '../helpers/db.js';
@@ -46,6 +47,8 @@ const github = {
   repos: [] as string[],
   collaborators: [] as Array<{ repo: string; username: string }>,
   issues: [] as Array<{ repo: string; title: string; body: string; labels: string[] }>,
+  /** Pull requests Tessl has opened, by the issue they answer. */
+  pulls: new Map<number, PullInfo>(),
 };
 const githubApi: GitHubApi = {
   ensureRepo: async (name) => {
@@ -65,6 +68,12 @@ const githubApi: GitHubApi = {
   openIssue: async (repo, title, body, labels) => {
     github.issues.push({ repo, title, body, labels });
     return { number: github.issues.length, url: `https://github.com/${repo}/issues/${github.issues.length}` };
+  },
+  findPullForIssue: async (_repo, issue) => github.pulls.get(issue),
+  getPull: async (_repo, number) => {
+    const pull = [...github.pulls.values()].find((candidate) => candidate.number === number);
+    if (!pull) throw new Error(`no pull request #${number}`);
+    return pull;
   },
 };
 
@@ -173,6 +182,7 @@ afterAll(async () => {
 
 describe('a project from start to finish', () => {
   let channel: FakeChannel;
+  let changeKey = '';
 
   it('1. Boran starts a project: private channel, invite and repo', async () => {
     const reply = await run(BORAN, lobby, 'new-project', { name: 'Booking App' });
@@ -208,7 +218,8 @@ describe('a project from start to finish', () => {
     const card = (await run(CLIENT, channel, 'project')).replies[0]!;
     expect(card.embeds[0]?.fields?.find((f) => f.name === 'Client')?.value).toBe(`<@${CLIENT.id}>`);
     expect(said(await run(CLIENT, channel, 'add-github', { username: 'ahmet-dev' }))).toContain('Invited **ahmet-dev**');
-    expect(github.collaborators).toEqual([{ repo: `boranfurkan/${PROJECT}`, username: 'ahmet-dev' }]);
+    expect(said(await run(CLIENT, channel, 'add-github', { username: 'ahmet-dev2' }))).toContain('read-only access');
+    expect(github.collaborators.map((c) => c.username)).toEqual(['ahmet-dev', 'ahmet-dev2']);
   });
 
   it('5. Commands at the wrong stage are refused in plain words', async () => {
@@ -335,6 +346,29 @@ describe('a project from start to finish', () => {
     // A second click can't open a second issue.
     expect(said(await click(BORAN, channel, approveId))).toContain('already been handled');
     expect(github.issues).toHaveLength(1);
+    changeKey = approveId.slice(APPROVE_PREFIX.length);
+  });
+
+  it("15b. Tessl's pull request is posted in the channel, then its merge", async () => {
+    const check = async () => checkChangeRequest(guild as never, ctx, (await getChangeRequest(db, changeKey))!);
+    await check(); // no pull request yet: nothing happens
+    expect(channel.botText().at(-1)).not.toContain('pull request #7');
+
+    github.pulls.set(1, { number: 7, url: 'https://github.com/boranfurkan/booking-app/pull/7', state: 'open', merged: false, branch: 'tessl/issue-1' });
+    await check();
+    expect(channel.botText().at(-1)).toContain('Tessl has proposed **Make the Book button green** as pull request #7');
+    expect(channel.botText().at(-1)).toContain('Furkan reviews it before anything is merged');
+    expect(guild.channelNamed('owner-desk').botText().at(-1)).toContain('Review **booking-app**: Tessl opened pull request #7');
+    expect(await getChangeRequest(db, changeKey)).toMatchObject({ status: 'pr_open', pr_number: 7 });
+
+    await check(); // still open: nothing new is posted
+    const posted = channel.botText().length;
+    github.pulls.set(1, { ...github.pulls.get(1)!, state: 'closed', merged: true });
+    await check();
+    expect(channel.botText()).toHaveLength(posted + 1);
+    expect(channel.botText().at(-1)).toContain('**Make the Book button green** is done: pull request #7 has been merged');
+    expect((await getChangeRequest(db, changeKey))?.status).toBe('merged');
+    expect(remembered.some((text) => text.includes('merged: Make the Book button green'))).toBe(true);
   });
 
   it('16. A bigger request is sent back for a new quote, and Boran is told', async () => {
@@ -380,6 +414,8 @@ describe('a project from start to finish', () => {
       'change.requested',
       'change.approved',
       'change.issue_opened',
+      'change.pr_opened',
+      'change.merged',
     ]) {
       expect(actions, step).toContain(step);
     }

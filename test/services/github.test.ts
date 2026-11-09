@@ -64,7 +64,7 @@ describe('addCollaborator', () => {
   it('reports a new invitation and an existing collaborator', async () => {
     const invited = fakeFetch({ 'PUT /repos/example-owner/alpha/collaborators/octocat': () => ({ status: 201, json: {} }) });
     expect(await createGitHub(env, { fetch: invited.fetchImpl }).addCollaborator('example-owner/alpha', 'octocat')).toBe('invited');
-    expect(invited.calls[0]?.body).toEqual({ permission: 'push' });
+    expect(invited.calls[0]?.body).toEqual({ permission: 'pull' }); // read-only
 
     const already = fakeFetch({ 'PUT /repos/example-owner/alpha/collaborators/octocat': () => ({ status: 204 }) });
     expect(await createGitHub(env, { fetch: already.fetchImpl }).addCollaborator('example-owner/alpha', 'octocat')).toBe('already');

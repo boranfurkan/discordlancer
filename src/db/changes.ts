@@ -52,7 +52,7 @@ export async function updateChangeRequest(
   db: Surreal,
   request: Pick<ChangeRequest, 'id' | 'project'>,
   from: ChangeStatus,
-  changes: { status: ChangeStatus; issue_number?: number },
+  changes: { status: ChangeStatus; issue_number?: number; pr_number?: number },
   event: Omit<EventInput, 'project'>,
 ): Promise<boolean> {
   try {
@@ -83,4 +83,12 @@ export async function countChangeRequestsSince(db: Surreal, project: Pick<Projec
     { p: project.id, since },
   );
   return rows[0] ?? 0;
+}
+
+/** Change requests waiting on GitHub: an issue with no pull request yet, or an open pull request. */
+export async function listChangeRequestsByStatus(db: Surreal, statuses: readonly ChangeStatus[]): Promise<ChangeRequest[]> {
+  const [rows] = await db.query<[unknown[]]>('SELECT * FROM change_request WHERE status IN $statuses ORDER BY created_at', {
+    statuses: [...statuses],
+  });
+  return rows.map((row) => ChangeRequestRow.parse(row));
 }

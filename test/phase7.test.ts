@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { countChangeRequestsSince, createChangeRequest, getChangeRequest, updateChangeRequest } from '../src/db/changes.js';
 import { createProject, getProjectByName } from '../src/db/projects.js';
 import { issueBody, TriageOutput } from '../src/prompts/after-delivery.js';
-import { chooseFiles, createGitHub, SNAPSHOT_LIMITS } from '../src/services/github.js';
+import { chooseFiles, createGitHub, matchPullForIssue, SNAPSHOT_LIMITS } from '../src/services/github.js';
 import { createMemory, projectScope, safeRecall, safeRemember, type MemoryApi } from '../src/services/memory.js';
 import { memoryDb } from './helpers/db.js';
 
@@ -154,5 +154,34 @@ describe('change requests', () => {
     const project = (await getProjectByName(db, 'cr'))!;
     expect(await countChangeRequestsSince(db, project, new Date(Date.now() - 60_000))).toBe(1);
     expect(await countChangeRequestsSince(db, project, new Date(Date.now() + 60_000))).toBe(0);
+  });
+});
+
+describe('matchPullForIssue', () => {
+  const pull = (number: number, ref: string, title: string, extra: Record<string, unknown> = {}) => ({
+    number,
+    html_url: `https://github.com/o/r/pull/${number}`,
+    title,
+    body: '',
+    state: 'open',
+    merged_at: null,
+    head: { ref },
+    ...extra,
+  });
+
+  it("finds Tessl's pull request by its branch or title, as seen in the real test", () => {
+    expect(matchPullForIssue([pull(2, 'tessl/issue-1', '#1: Make the Book button green')], 1)).toMatchObject({ number: 2, state: 'open', merged: false });
+    expect(matchPullForIssue([pull(3, 'feature/x', '#4: Fix footer')], 4)?.number).toBe(3);
+    expect(matchPullForIssue([pull(5, 'other', 'Something', { body: 'This closes #9.' })], 9)?.number).toBe(5);
+  });
+
+  it('does not confuse issue 1 with issue 10, or match unrelated pull requests', () => {
+    expect(matchPullForIssue([pull(2, 'tessl/issue-10', '#10: Other')], 1)).toBeUndefined();
+    expect(matchPullForIssue([pull(2, 'main-fix', 'Refactor (see #1 later)')], 1)).toBeUndefined();
+  });
+
+  it('reports merged and closed pull requests', () => {
+    expect(matchPullForIssue([pull(2, 'tessl/issue-1', '#1: x', { state: 'closed', merged_at: '2026-11-09T14:00:00Z' })], 1)).toMatchObject({ state: 'closed', merged: true });
+    expect(matchPullForIssue([pull(2, 'tessl/issue-1', '#1: x', { state: 'closed' })], 1)).toMatchObject({ state: 'closed', merged: false });
   });
 });

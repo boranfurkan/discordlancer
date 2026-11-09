@@ -6,26 +6,27 @@ Freeze: **Wed 18 Nov, 6pm.** The client comes first, so bot work fits around the
 
 **Morning of Mon 9 Nov, in this order.** The bot was built overnight (phases 1, 2 and 4 to 7). It is running on the Mac until it is deployed.
 
-1. [ ] **Ask your referrer for an intro.** Keep the message for the audit, and log the ask as a touch.
+1. [x] **Ask your referrer for an intro.** Keep the message for the audit, and log the ask as a touch.
 2. [x] **GitHub token:** replaced with a classic token (`repo` scope only). The fine-grained token kept failing to add collaborators even with Administration: Read and write. Delete the old fine-grained token if you haven't.
 3. [x] **Discord:** the bot's role has **Pin Messages**.
 4. [x] `npm run check:env`: 23 passed on 9 Nov, morning.
 5. [ ] **Real-person check, about 2 minutes, when Ahmet Bey has time.** Run `/new-project dl-test-one` and send him only that invite. Check that only `#dl-test-one` opens, with the welcome and the Client role, and that `/help` and `/project` work for him. Everything else is covered by the automated journey test (`test/e2e/journey.test.ts`).
    - [ ] **Later, Boran:** a real 0.01 USDC payment through `/pay` with Phantom, to confirm Phantom includes the reference.
-6. [ ] **Review the default quote terms** in `src/discord/texts.ts` (`quoteTerms`).
+6. [x] **Review the default quote terms** in `src/discord/texts.ts` (`quoteTerms`).
 7. [ ] **Deploy to Replit:** follow `DEPLOY.md`, and stop the copy on the Mac first. Redeem the Pro coupon (`replit.com/~?redeemCoupon=[code removed]`).
 8. [ ] **Hackathon admin:**
-   - tell the organisers you're solo;
-   - declare your Solana receiving wallet before the first payment.
+   - [x] the organisers know you're solo;
+   - [ ] declare your Solana receiving wallet to them before the first payment.
 9. [ ] **Before using Approve on a real client's change request:**
    - [x] Tessl GitHub App on `boranfurkan`, reaching all repos (checked 9 Nov);
    - [x] end-to-end test passed on `dl-test-tessl` (PR in about 70 s, 17 credits);
    - [ ] turn on the factory for the client's repo (the `tessl__factory-setup` skill, as for the test repo);
    - [ ] decide: limit Tessl to pull requests only (move its automations into `tessl.json`), and/or GitHub Pro to protect `main`.
+   - [ ] note: clients are added read-only, but on a private repo **any human comment on a Tessl pull request starts a "Shepherd PR" run**. A client's comment could change the pull request and spend credits without your approval. Moving the automations into `tessl.json` is also where to limit who can trigger runs.
 10. [x] **Test leftovers cleaned up (9 Nov):**
     - Discord channels, the database and the test repos were reset (backup in `backups/`);
     - `boranfurkan/dl-test-tessl` stays on purpose, for `scripts/tessl-e2e.ts`.
-11. [ ] Delete the Cloudflare API token (dashboard → My Profile → API Tokens), and the old fine-grained GitHub token if it still exists.
+11. [x] Cloudflare API token and the old fine-grained GitHub token deleted.
 
 Done earlier:
 - [x] env values collected;
@@ -225,7 +226,7 @@ Skills: the `tessl__*` skills, `gemini-api-dev`, `surrealdb-agent-memory-docs`.
   - Limit: 10 per 30 days.
   - Reporting the pull request back is not built yet.
 - [ ] Turn on the Tessl factory for a real client repo: scriptable with the `tessl__factory-setup` skill, done for `dl-test-tessl` on 9 Nov. Decide first whether to limit it to pull requests only (see Boran, step 9).
-- [ ] Report Tessl's pull request back into the Discord channel. Not built yet: Boran sees it on GitHub for now.
+- [x] Report Tessl's pull request back into the Discord channel: posted when it opens (plus a review reminder in owner-desk), when it's merged, and when it's closed. Checked every minute; matching tested against the real Tessl pull request.
 - [x] Agent Memory through REST, one scope per project (`discordlancer/project/<name>`), registered on first use:
   - **written** when specs are agreed, a quote is accepted, a payment arrives, a delivery is confirmed, and a change is triaged or approved;
   - **recalled** in `/create-specs`, `/progress` and triage.

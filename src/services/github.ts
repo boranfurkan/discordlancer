@@ -27,6 +27,43 @@ export interface RepoSnapshot {
   files: Array<{ path: string; content: string }>;
 }
 
+export interface PullInfo {
+  number: number;
+  url: string;
+  state: 'open' | 'closed';
+  merged: boolean;
+  branch: string;
+}
+
+interface RawPull {
+  number: number;
+  html_url: string;
+  title: string;
+  body?: string | null;
+  state: string;
+  merged_at?: string | null;
+  head: { ref: string };
+}
+
+/**
+ * Pure: the pull request Tessl opened for an issue. Tessl names its branch
+ * `tessl/issue-<n>` and titles the pull request `#<n>: …` (seen on 9 Nov).
+ */
+export function matchPullForIssue(pulls: readonly RawPull[], issue: number): PullInfo | undefined {
+  const branch = `tessl/issue-${issue}`;
+  const closes = new RegExp(`\\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\\s+#${issue}\\b`, 'i');
+  const pull = pulls.find(
+    (candidate) =>
+      candidate.head.ref === branch ||
+      candidate.head.ref.startsWith(`${branch}-`) ||
+      candidate.title.startsWith(`#${issue}:`) ||
+      closes.test(candidate.body ?? ''),
+  );
+  return pull
+    ? { number: pull.number, url: pull.html_url, state: pull.state === 'open' ? 'open' : 'closed', merged: Boolean(pull.merged_at), branch: pull.head.ref }
+    : undefined;
+}
+
 /** What the bot needs from GitHub. Tests use a fake. */
 export interface GitHubApi {
   ensureRepo(name: string, description: string): Promise<RepoInfo>;
@@ -35,6 +72,10 @@ export interface GitHubApi {
   readRepo(repo: string): Promise<RepoSnapshot>;
   /** Opens an issue, then adds the labels in a second call (creating them if missing). */
   openIssue(repo: string, title: string, body: string, labels: string[]): Promise<{ number: number; url: string }>;
+  /** The pull request opened for this issue, if there is one yet. */
+  findPullForIssue(repo: string, issue: number): Promise<PullInfo | undefined>;
+  /** A pull request's current state. */
+  getPull(repo: string, number: number): Promise<PullInfo>;
 }
 
 const SKIP_DIRS = /(^|\/)(node_modules|dist|build|out|coverage|vendor|\.git|\.next|\.venv|__pycache__)\//;
@@ -118,10 +159,12 @@ export function createGitHub(
           owner: repoOwner,
           repo: repoName,
           username,
-          permission: 'push',
+          // Read-only: clients can see and clone the code, but never push to it.
+          permission: 'pull',
           ...signal(),
         });
-        // 201: an invitation was sent. 204: they already have access.
+        // 201: an invitation was sent. 204: they already have access (a re-invite also
+        // sets the permission to read-only).
         return response.status === 201 ? 'invited' : 'already';
       } catch (error) {
         const code = status(error);
@@ -173,6 +216,28 @@ export function createGitHub(
       // Added in a second call: the Tessl docs don't say a label present at creation starts a run.
       if (labels.length) await octokit.rest.issues.addLabels({ owner: repoOwner, repo: repoName, issue_number: issue.number, labels, ...signal() });
       return { number: issue.number, url: issue.html_url };
+    },
+
+    async findPullForIssue(repo, issue) {
+      const [repoOwner, repoName] = repo.split('/');
+      if (!repoOwner || !repoName) throw new GitHubError(`Bad repo name ${repo}`);
+      const { data } = await octokit.rest.pulls.list({
+        owner: repoOwner,
+        repo: repoName,
+        state: 'all',
+        sort: 'created',
+        direction: 'desc',
+        per_page: 30,
+        ...signal(),
+      });
+      return matchPullForIssue(data, issue);
+    },
+
+    async getPull(repo, number) {
+      const [repoOwner, repoName] = repo.split('/');
+      if (!repoOwner || !repoName) throw new GitHubError(`Bad repo name ${repo}`);
+      const { data } = await octokit.rest.pulls.get({ owner: repoOwner, repo: repoName, pull_number: number, ...signal() });
+      return { number: data.number, url: data.html_url, state: data.state === 'open' ? 'open' : 'closed', merged: data.merged, branch: data.head.ref };
     },
   };
 }

@@ -1,4 +1,4 @@
-// /add-github username: gives a GitHub account write access to the project repo.
+// /add-github username: gives a GitHub account read-only access to the project repo.
 
 import { SlashCommandBuilder } from 'discord.js';
 import { updateProject } from '../../db/projects.js';
@@ -43,7 +43,7 @@ export const addGithub: Command = {
     );
     await interaction.editReply(
       result === 'invited'
-        ? `Invited **${username}** to \`${project.repo}\` with write access. GitHub has emailed them an invitation to accept.`
+        ? `Invited **${username}** to \`${project.repo}\` with read-only access (they can see and clone the code). GitHub has emailed them an invitation to accept.`
         : `**${username}** already has access to \`${project.repo}\`.`,
     );
   },
