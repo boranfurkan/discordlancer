@@ -235,6 +235,14 @@ Skills: the `tessl__*` skills, `gemini-api-dev`, `surrealdb-agent-memory-docs`.
   Memory is best-effort: a failure is logged and never stops a command.
 - [ ] Optional: connect the Agent Memory MCP server for development.
 
+### Phase 8: Questions (added 9 Nov)
+
+- [x] `/ask question` for anyone in the project; a client gets 15 a day per project.
+- [x] Boran's "answer this": reply to the client's message and tag the bot (the rest of his message is a note for the answer), or **Apps → Answer with AI** (owner only, hidden from clients).
+- [x] Context gathered fresh for each answer: the live chat (bot posts included), spec, quote, payments, change requests, Agent Memory and the code. See `PLAN.md`, Questions.
+- [x] Guardrails tested against the real Gemini: a normal question, a discount request (refused, flagged to Boran) and a prompt injection (refused).
+- [ ] **Live check after deploying:** in a test channel, try `/ask`, a tagged reply and the menu once each.
+
 **Tried live on 9 Nov (overnight)** on `dl-test-gamma`:
 - `/progress` gave "about 0%", correctly, with the spec's features listed as still to do;
 - a small request was triaged as small and then declined with the button;

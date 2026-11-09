@@ -125,6 +125,7 @@ const PHRASES: Record<string, (project: string, data: Record<string, unknown>) =
   'payment.requested': (p) => `opened a payment request for ${p}`,
   'development.started': (p) => `started building ${p}`,
   'delivery.marked': (p) => `marked ${p} delivered`,
+  'question.answered': (p) => `had the AI assistant answer client questions on ${p}`,
   'project.cancelled': (p) => `cancelled ${p}`,
   'project.archived': (p) => `archived ${p}`,
 };

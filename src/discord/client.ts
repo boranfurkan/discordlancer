@@ -15,6 +15,7 @@ import { getProjectByChannel, StageConflictError, type Project } from '../db/pro
 import { log } from '../log.js';
 import { UserError, type BotContext, type Command } from './command.js';
 import { actorFor, checkAccess } from './guards.js';
+import { onAnswerMenu } from './ownerAnswer.js';
 import { STAGE_LABEL } from './texts.js';
 
 export function createDiscordClient(): Client {
@@ -25,7 +26,9 @@ export function createDiscordClient(): Client {
       GatewayIntentBits.GuildMembers,
       // To be told about invites; join tracking itself reads them fresh from Discord.
       GatewayIntentBits.GuildInvites,
-      // Privileged: so fetched messages include their text, for specs.
+      // To hear Boran tag the bot in a project channel ("answer this").
+      GatewayIntentBits.GuildMessages,
+      // Privileged: so messages include their text, for specs and answers.
       GatewayIntentBits.MessageContent,
     ],
   });
@@ -42,7 +45,9 @@ export function handleInteractions(client: Client, ctx: BotContext, buttons: Rec
 
 /** Handles one interaction to completion. The bot calls it per event; tests await it. */
 export function routeInteraction(interaction: Interaction, ctx: BotContext, buttons: Record<string, ButtonHandler> = {}): Promise<void> {
-  return interaction.isButton() ? onButton(interaction, ctx, buttons) : onInteraction(interaction, ctx);
+  if (interaction.isButton()) return onButton(interaction, ctx, buttons);
+  if (interaction.isMessageContextMenuCommand()) return onAnswerMenu(interaction, ctx);
+  return onInteraction(interaction, ctx);
 }
 
 async function onButton(interaction: ButtonInteraction, ctx: BotContext, buttons: Record<string, ButtonHandler>): Promise<void> {

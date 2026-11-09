@@ -165,6 +165,8 @@ Commands are registered on our server only, so changes appear instantly. Every c
 | `/touches` | Boran | 6 | Drafts today's `/touch` line from the owner events |
 | `/progress` | Both | 7 | Gemini compares the repo with the agreed spec. Gives a summary and an estimated percentage, marked as an estimate. (Not `/status`: the Wordle app in our server has one) |
 | `/request-update text` | Client | 7 | After delivery: asks for a small change, handled by Tessl |
+| `/ask question` | Both | 8 | The AI assistant answers a question about the project in the channel (see Questions) |
+| Tag the bot in a reply, or **Apps → Answer with AI** on a message | Boran | 8 | The assistant answers that client message as a reply (see Questions) |
 | `/cancel`, `/archive` | Boran | 2 | Closes the project. The channel becomes read-only and nothing is deleted |
 
 ## Discord details
@@ -214,7 +216,20 @@ Based on the `gemini-api-dev` skill. Fetch its docs page for the interactions AP
 - **Structured output** for every call, validated with Zod, because a model can return well-formed nonsense.
 - **Client messages, files and code are data.** They're delimited and labelled in the prompt, never mixed with our instructions.
 - **Save the model and prompt version** with each result.
-- **Limits:** `/progress` 3 times a day per project, and `/request-update` 10 per 30 days per project.
+- **Limits:** `/progress` 3 times a day per project, `/request-update` 10 per 30 days per project, and a client's `/ask` 15 times a day per project.
+
+## Questions
+
+Clients ask with `/ask`. Boran gets an answer to a client's message by replying to it and tagging the bot (words after the tag are a note for the answer, such as "say SMS is extra"), or with **Apps → Answer with AI** on the message, which only he sees. The answer is posted as a reply and always marked as an AI answer, with what it was based on.
+
+- **Context, gathered fresh for every answer, so it's never out of date:**
+  - the whole channel conversation, read live from Discord, including the bot's own posts (the newest 150,000 characters);
+  - the latest spec and whether both agreed it, the latest quote, payments, delivery and change requests, from SurrealDB;
+  - Agent Memory recall for the question, in the project's scope;
+  - the code on the default branch (the same files `/progress` reads). If GitHub fails, the answer says the code couldn't be read.
+- **Guardrails (prompt `answer-v1`):** it answers only from that context; it never agrees to a new price, discount, deadline or scope; it never repeats secrets; and client text and code are data. When something needs Boran it says so, and he's told in `#owner-desk`. Tested live on 9 Nov with a normal question, a discount request and a prompt injection: all three were handled correctly.
+- **Touches:** Boran's tag or menu answers are owner actions and appear in `/touches`. A client's `/ask` isn't a touch.
+- **Events:** `ask.answered` (from `/ask`) and `question.answered` (Boran's), with the model, prompt version, commit and whether it needs Boran.
 
 ## Change requests after delivery
 
@@ -237,7 +252,7 @@ Based on the `gemini-api-dev` skill. Fetch its docs page for the interactions AP
 - **The database holds what must be exact:** stages, versions, amounts, signatures and events.
 - **Agent Memory (REST) holds what's useful to recall:** the client's preferences, decisions and their reasons, past requests, and what was tried.
   - **When it's written:** when specs are agreed, a quote is accepted, a decision is made, or a request is triaged.
-  - **When it's recalled:** when writing specs, quotes and triage.
+  - **When it's recalled:** when writing specs, quotes and triage, and for every answer to a question.
   - **Scope:** one per project, `discordlancer/project/<name>`. Agent Memory refuses writes to an unregistered scope ("unknown scope node"), so the bot registers the path chain with `POST /scopes` (idempotent) on first use.
 
 This aims at the Best Use of Memory prize: Boran repeats less and touches less because the bot remembers.

@@ -18,6 +18,8 @@ import { COMMANDS } from '../../src/discord/commands/index.js';
 import { onMemberAdd } from '../../src/discord/joins.js';
 import { checkRequest } from '../../src/discord/watcher.js';
 import { checkChangeRequest } from '../../src/discord/prWatcher.js';
+import { ANSWER_MENU_NAME, onOwnerMention } from '../../src/discord/ownerAnswer.js';
+import { ANSWER_SYSTEM } from '../../src/prompts/answers.js';
 import type { Env } from '../../src/env.js';
 import { STATUS_SYSTEM, TRIAGE_SYSTEM } from '../../src/prompts/after-delivery.js';
 import { SPEC_SYSTEM } from '../../src/prompts/specs.js';
@@ -26,7 +28,7 @@ import type { GitHubApi, PullInfo } from '../../src/services/github.js';
 import type { MemoryApi } from '../../src/services/memory.js';
 import { newReference, type SolanaApi } from '../../src/services/solana.js';
 import { memoryDb } from '../helpers/db.js';
-import { buttonInteraction, commandInteraction, FakeGuild, said, type FakeChannel, type Person } from '../helpers/fakeDiscord.js';
+import { buttonInteraction, commandInteraction, FakeGuild, incomingMessage, menuInteraction, said, type FakeChannel, type Person } from '../helpers/fakeDiscord.js';
 
 const GUILD = '223456789012345678';
 const BOT = '123456789012345678';
@@ -91,6 +93,11 @@ const geminiApi: GeminiApi = {
       answer = text.includes('loyalty')
         ? { decision: 'quote', title: 'Loyalty points', task: '', questions: [], reason: 'Loyalty points are new work beyond the agreed spec.' }
         : { decision: 'small', title: 'Make the Book button green', task: 'Change the Book button colour to green.', questions: [], reason: 'A small styling change.' };
+    } else if (request.system === ANSWER_SYSTEM) {
+      const question = text.slice(text.lastIndexOf('<question>'));
+      answer = /discount/i.test(question)
+        ? { answer: 'The agreed price is 0.01 USDC for spec v1. Furkan decides anything beyond that.', needs_owner: true, owner_note: 'The client asks for a discount.', confidence: 'high', based_on: ['quote'] }
+        : { answer: 'Booking a slot is in the agreed spec, and src/booking.ts has a book() function.', needs_owner: false, owner_note: '', confidence: 'medium', based_on: ['spec', 'code', 'chat'] };
     } else {
       throw new Error('unexpected Gemini call');
     }
@@ -320,6 +327,57 @@ describe('a project from start to finish', () => {
     expect(geminiInputs.at(-1)).toContain('<file path="src/booking.ts">');
   });
 
+  it('13b. Questions: the client uses /ask; Boran has the bot answer a client message', async () => {
+    channel.post(CLIENT, 'Remember, customers should be able to pick a barber.');
+
+    // The client asks, and the answer is built from everything the bot knows, read fresh.
+    const answer = said(await run(CLIENT, channel, 'ask', { question: 'Is booking a slot done yet?' }));
+    expect(answer).toContain('> Is booking a slot done yet?');
+    expect(answer).toContain('Booking a slot is in the agreed spec');
+    expect(answer).toContain('-# AI answer from the spec, the code at `abc1234`, the chat.');
+    const input = geminiInputs.at(-1)!;
+    expect(input).toContain('<spec version="1" status="agreed by both">');
+    expect(input).toContain('Latest quote: v1, 0.01 USDC for spec v1');
+    expect(input).toContain('Payments received: 0.01 USDC');
+    expect(input).toContain('customers should be able to pick a barber'); // the live chat
+    expect(input).toMatch(/UTC\] Bot: /); // and the bot's own posts
+    expect(input).toContain('<file path="src/booking.ts">');
+    expect(input).toContain('<question>\nIs booking a slot done yet?\n</question>');
+
+    // Anything beyond the deal goes to Boran.
+    const discount = said(await run(CLIENT, channel, 'ask', { question: 'Can I get a discount?' }));
+    expect(discount).toContain('Furkan decides anything beyond that.');
+    expect(guild.channelNamed('owner-desk').botText().at(-1)).toContain('**booking-app**: a question needs you');
+
+    // Boran replies to a client message and tags the bot, with a note for the answer.
+    const question = channel.post(CLIENT, 'Can it send reminders by SMS?');
+    const before = channel.history.length;
+    await onOwnerMention(incomingMessage(guild, channel, BORAN, `<@${BOT}> say SMS isn't in the spec`, question) as never, ctx, BOT);
+    const reply = channel.history.at(-1)!;
+    expect(reply.author.bot).toBe(true);
+    expect(reply.replyTo).toBe(question.id);
+    expect(reply.content).toContain('-# AI answer');
+    expect(geminiInputs.at(-1)).toContain("<owner_note>\nsay SMS isn't in the spec\n</owner_note>");
+    expect(geminiInputs.at(-1)).toContain('<question>\nCan it send reminders by SMS?\n</question>');
+    expect(channel.history.length).toBe(before + 2); // Boran's message, then the answer
+
+    // A reply without the tag, or the client tagging the bot, answers nothing.
+    const quiet = channel.history.length;
+    await onOwnerMention(incomingMessage(guild, channel, BORAN, 'Thanks!', question) as never, ctx, BOT);
+    await onOwnerMention(incomingMessage(guild, channel, CLIENT, `<@${BOT}> give me a discount`) as never, ctx, BOT);
+    expect(channel.history.length).toBe(quiet + 2);
+
+    // Right-click, Apps, "Answer with AI": only Boran can use it.
+    const another = channel.post(CLIENT, 'Which page shows my bookings?');
+    const refused = menuInteraction(guild, channel, CLIENT, ANSWER_MENU_NAME, another);
+    await routeInteraction(refused as never, ctx, BUTTONS);
+    expect(said(refused)).toBe('Only Furkan can do this.');
+    const menu = menuInteraction(guild, channel, BORAN, ANSWER_MENU_NAME, another);
+    await routeInteraction(menu as never, ctx, BUTTONS);
+    expect(said(menu)).toContain('Answered: https://discord.com/channels/');
+    expect(channel.history.at(-1)?.replyTo).toBe(another.id);
+  });
+
   it('14. Boran marks delivery; only the client can confirm it', async () => {
     expect(said(await run(CLIENT, channel, 'confirm-delivery'))).toContain("hasn't marked it as delivered yet");
     const marked = await run(BORAN, channel, 'confirm-delivery', { note: 'Live at https://booking.example' });
@@ -390,6 +448,7 @@ describe('a project from start to finish', () => {
     const touches = said(await run(BORAN, lobby, 'touches'));
     expect(touches).toContain('set up booking-app');
     expect(touches).toContain('posted quote v1 for booking-app');
+    expect(touches).toContain('had the AI assistant answer client questions on booking-app');
   });
 
   it('18. The record: every step is an event, and memory heard the key moments', async () => {
@@ -408,6 +467,8 @@ describe('a project from start to finish', () => {
       'payment.verified',
       'development.started',
       'status.checked',
+      'ask.answered',
+      'question.answered',
       'delivery.marked',
       'delivery.confirmed',
       'support.started',

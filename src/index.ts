@@ -8,6 +8,7 @@ import { COMMANDS } from './discord/commands/index.js';
 import { APPROVE_PREFIX, DECLINE_PREFIX, onApproveChange, onDeclineChange } from './discord/commands/afterDelivery.js';
 import { CONFIRM_DELIVERY_BUTTON, onConfirmDeliveryButton } from './discord/commands/delivery.js';
 import { onMemberAdd } from './discord/joins.js';
+import { onOwnerMention } from './discord/ownerAnswer.js';
 import { createGemini } from './services/gemini.js';
 import { createGitHub } from './services/github.js';
 import { createMemory } from './services/memory.js';
@@ -65,6 +66,9 @@ async function main(): Promise<void> {
   });
   client.on(Events.GuildMemberAdd, (member) => {
     void onMemberAdd(member, ctx);
+  });
+  client.on(Events.MessageCreate, (message) => {
+    if (client.user) void onOwnerMention(message, ctx, client.user.id);
   });
 
   const shutdown = async (signal: string) => {

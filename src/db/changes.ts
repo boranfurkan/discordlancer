@@ -92,3 +92,9 @@ export async function listChangeRequestsByStatus(db: Surreal, statuses: readonly
   });
   return rows.map((row) => ChangeRequestRow.parse(row));
 }
+
+/** One project's change requests, oldest first. */
+export async function changeRequestsFor(db: Surreal, project: Pick<Project, 'id'>): Promise<ChangeRequest[]> {
+  const [rows] = await db.query<[unknown[]]>('SELECT * FROM change_request WHERE project = $p ORDER BY created_at', { p: project.id });
+  return rows.map((row) => ChangeRequestRow.parse(row));
+}

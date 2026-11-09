@@ -37,6 +37,9 @@ function toReply(kind: Reply['kind'], payload: unknown): Reply {
 
 export interface FakeMessage {
   id: string;
+  url: string;
+  /** The message this one replies to, if any. */
+  replyTo?: string | undefined;
   createdAt: Date;
   author: { id: string; bot: boolean; username: string };
   member: { displayName: string };
@@ -47,6 +50,8 @@ export interface FakeMessage {
   files: string[];
   pinned: boolean;
   pin(): Promise<void>;
+  /** discord.js: message.reply(payload), posted by the bot as a reply to this message. */
+  reply(payload: unknown): Promise<FakeMessage>;
 }
 
 export interface Person {
@@ -86,9 +91,20 @@ export class FakeChannel {
     };
   }
 
-  post(author: Person & { bot?: boolean }, content: string, files: string[] = []): FakeMessage {
+  /** Times the bot showed "is typing". */
+  typing = 0;
+
+  async sendTyping(): Promise<void> {
+    this.typing++;
+  }
+
+  post(author: Person & { bot?: boolean }, content: string, files: string[] = [], replyTo?: string): FakeMessage {
+    const id = snowflake();
+    const channel = this;
     const message: FakeMessage = {
-      id: snowflake(),
+      id,
+      url: `https://discord.com/channels/${this.guild.id}/${this.id}/${id}`,
+      replyTo,
       createdAt: new Date(),
       author: { id: author.id, bot: author.bot ?? false, username: author.name },
       member: { displayName: author.name },
@@ -100,6 +116,10 @@ export class FakeChannel {
       pinned: false,
       async pin() {
         this.pinned = true;
+      },
+      async reply(payload: unknown) {
+        const reply = toReply('reply', payload);
+        return channel.post({ id: channel.guild.botId, bot: true, name: 'Freelance Manager Bot' }, reply.content, reply.files, id);
       },
     };
     this.history.push(message);
@@ -207,6 +227,7 @@ export function commandInteraction(guild: FakeGuild, channel: FakeChannel, perso
     replied: false,
     isChatInputCommand: () => true,
     isButton: () => false,
+    isMessageContextMenuCommand: () => false,
     inCachedGuild: () => true,
     options: {
       getString: (name: string) => (typeof options[name] === 'string' ? (options[name] as string) : null),
@@ -251,6 +272,7 @@ export function buttonInteraction(guild: FakeGuild, channel: FakeChannel, person
     replied: false,
     isChatInputCommand: () => false,
     isButton: () => true,
+    isMessageContextMenuCommand: () => false,
     inCachedGuild: () => true,
     async reply(payload: unknown) {
       interaction.replied = true;
@@ -271,6 +293,56 @@ export function buttonInteraction(guild: FakeGuild, channel: FakeChannel, person
     },
   };
   return interaction;
+}
+
+/** Right-click on a message, Apps, then a message menu command. */
+export function menuInteraction(guild: FakeGuild, channel: FakeChannel, person: Person, commandName: string, target: FakeMessage) {
+  const replies: Reply[] = [];
+  const interaction = {
+    replies,
+    commandName,
+    targetMessage: target,
+    user: { id: person.id, username: person.name, bot: false },
+    guild,
+    guildId: guild.id,
+    channel,
+    channelId: channel.id,
+    deferred: false,
+    replied: false,
+    isChatInputCommand: () => false,
+    isButton: () => false,
+    isMessageContextMenuCommand: () => true,
+    inCachedGuild: () => true,
+    async reply(payload: unknown) {
+      interaction.replied = true;
+      replies.push(toReply('reply', payload));
+    },
+    async deferReply(payload?: unknown) {
+      interaction.deferred = true;
+      replies.push(toReply('deferReply', payload ?? {}));
+    },
+    async editReply(payload: unknown) {
+      replies.push(toReply('editReply', payload));
+    },
+  };
+  return interaction;
+}
+
+/** A person's message, as the bot receives it: with mentions resolved and its reply target. */
+export function incomingMessage(guild: FakeGuild, channel: FakeChannel, person: Person, content: string, replyTo?: FakeMessage) {
+  const posted = channel.post(person, content, [], replyTo?.id);
+  return Object.assign(posted, {
+    guildId: guild.id,
+    guild,
+    channel,
+    channelId: channel.id,
+    inGuild: () => true,
+    reference: replyTo ? { messageId: replyTo.id } : null,
+    fetchReference: async () => {
+      if (!replyTo) throw new Error('not a reply');
+      return replyTo;
+    },
+  });
 }
 
 /** Every reply's text, joined, for simple "contains" checks. */

@@ -5,7 +5,7 @@
 import type { TextChannel } from 'discord.js';
 import { IMAGE_TYPES, type Part } from '../services/gemini.js';
 
-export type Role = 'owner' | 'client' | 'other';
+export type Role = 'owner' | 'client' | 'other' | 'bot';
 
 export interface ChatAttachment {
   name: string;
@@ -35,6 +35,8 @@ export async function readConversation(
   channel: TextChannel,
   since: Date,
   people: { ownerId: string; clientId?: string | undefined },
+  /** Also include the bot's own posts (for answering questions; specs leave them out). */
+  options: { includeBot?: boolean } = {},
 ): Promise<ChatMessage[]> {
   const messages: ChatMessage[] = [];
   let before: string | undefined;
@@ -47,9 +49,14 @@ export async function readConversation(
         reachedStart = true;
         continue;
       }
-      if (message.author.bot || message.system) continue;
-      const role: Role =
-        message.author.id === people.ownerId ? 'owner' : message.author.id === people.clientId ? 'client' : 'other';
+      if (message.system || (message.author.bot && !options.includeBot)) continue;
+      const role: Role = message.author.bot
+        ? 'bot'
+        : message.author.id === people.ownerId
+          ? 'owner'
+          : message.author.id === people.clientId
+            ? 'client'
+            : 'other';
       messages.push({
         at: message.createdAt,
         role,
@@ -106,7 +113,7 @@ export function planAttachments(messages: readonly ChatMessage[]): AttachmentPla
   return plan;
 }
 
-const ROLE_LABEL: Record<Role, string> = { owner: 'Furkan (owner)', client: 'Client', other: 'Other member' };
+const ROLE_LABEL: Record<Role, string> = { owner: 'Furkan (owner)', client: 'Client', other: 'Other member', bot: 'Bot' };
 
 /** Pure: the conversation as tagged text, with numbered image markers and file contents. */
 export function renderConversation(
