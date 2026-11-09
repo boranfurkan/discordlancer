@@ -185,12 +185,20 @@ The client steps were done by a labelled test script, using a throwaway wallet w
 
 ### Phase 6: Delivery and evidence (target Fri 13 Nov)
 
-- [ ] `/confirm-delivery`: Boran marks it, then the client confirms with a button.
-- [ ] `/export`: posts the evidence pack to a private owner-only channel.
-- [ ] `/report`: drafts the daily sales report for the organisers.
-- [ ] `/touches`: drafts today's `/touch` line.
+- [x] `/confirm-delivery`: Boran marks it, with an optional note, then the client confirms with a button or the command. Only the client can confirm.
+- [x] `/export`: posts the evidence pack to `owner-desk`:
+  - a summary (project, specs, quotes, agreements, payments with explorer links, event log);
+  - the full channel transcript;
+  - the events as JSON;
+  - the spec files.
+- [x] `/report`: drafts the daily sales report for the organisers, with transaction hashes and the running total. Test projects are left out.
+- [x] `/touches`: drafts today's `/touch` line from Boran's own recorded actions. Test projects are left out.
 
-**Done when:** a test project's full history exports cleanly, and the drafts read right.
+**Done when:** a test project's full history exports cleanly, and the drafts read right. **Met on 9 Nov (overnight)** on `dl-test-gamma`, which was moved to paid by a labelled test script: no payment was made or recorded.
+
+**Still needs Boran:**
+- **Second-account test:** the client clicks "Confirm delivery".
+- **Read a `/report` draft** against what the organisers ask for, once a real payment exists.
 
 ### Phase 7: After delivery (once the client's build is on track)
 
