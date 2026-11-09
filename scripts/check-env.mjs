@@ -10,11 +10,13 @@
 // It prints names, pass or fail, and details that come back from the services.
 // It never prints a value from .env, and every message is scrubbed of secrets.
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+// Locally the values come from .env; on Replit there is no .env, only Secrets.
 const ENV_PATH = fileURLToPath(new URL('../.env', import.meta.url));
-process.loadEnvFile(ENV_PATH);
+const HAS_ENV_FILE = existsSync(ENV_PATH);
+if (HAS_ENV_FILE) process.loadEnvFile(ENV_PATH);
 
 const NAMES = [
   'DISCORD_TOKEN', 'DISCORD_APPLICATION_ID', 'DISCORD_GUILD_ID', 'DISCORD_OWNER_ID',
@@ -97,6 +99,7 @@ await check('.env', 'formats', () => {
 // Node treats an unquoted # as the start of a comment, which silently cuts a value short.
 // Only the names are reported.
 await check('.env', 'no values cut short by #', () => {
+  if (!HAS_ENV_FILE) return 'no .env file (values come from the environment)';
   const cut = readFileSync(ENV_PATH, 'utf8').split('\n').flatMap((line) => {
     const match = /^\s*(?:export\s+)?([A-Z0-9_]+)\s*=\s*(.*)$/.exec(line);
     if (!match) return [];

@@ -2,7 +2,7 @@
 
 A Discord bot that runs Boran's freelance software projects from first chat to support: a private channel and GitHub repo for each client, specs, quote, payment in USDC on Solana, delivery, and small change requests handed to Tessl. Built first for Shipyard's Make Me Money hackathon (freeze Wed 18 Nov 2026, 6pm) and kept afterwards.
 
-Read `PLAN.md` for the design, `TODO.md` for the current phase, and `NOTES.md` for the hackathon rules and organiser rulings. `TOOLS.md` lists the skills and MCP servers and why each was chosen.
+Read `PLAN.md` for the design, `TODO.md` for the current phase, and `NOTES.md` for the hackathon rules and organiser rulings. `TOOLS.md` lists the skills and MCP servers and why each was chosen. `DEPLOY.md` covers deploying to Replit.
 
 ## Skills and docs
 

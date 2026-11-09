@@ -102,10 +102,11 @@ Skills: `typescript-node`, `surreal-data`. Context7 for discord.js and Octokit.
 
 Needed before the first invite goes to a real client, because join tracking needs the bot online.
 
+- [x] Write the deploy guide: `DEPLOY.md`. The env check now works without a `.env` file, as on Replit.
 - [ ] Import the GitHub repo into Replit. Check that it runs Node 24.
 - [ ] Add every variable in Replit Secrets, then run `npm run check:env` there.
 - [ ] Deploy as a **Reserved VM** with exactly one instance. Build: `npm ci && npm run build`. Start: `npm start`.
-- [ ] Note the steps in `TOOLS.md`.
+- [x] Note the steps: in `DEPLOY.md`.
 
 **Done when:** the bot stays online with your laptop closed, and a test join from a second account works.
 
