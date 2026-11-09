@@ -10,14 +10,8 @@ Freeze: **Wed 18 Nov, 6pm.** The client comes first, so bot work fits around the
 2. [x] **GitHub token:** replaced with a classic token (`repo` scope only). The fine-grained token kept failing to add collaborators even with Administration: Read and write. Delete the old fine-grained token if you haven't.
 3. [x] **Discord:** the bot's role has **Pin Messages**.
 4. [x] `npm run check:env`: 23 passed on 9 Nov, morning.
-5. [ ] **Second-account test on `dl-test-alpha`,** playing the client with another Discord account:
-   - join with `dl-test-alpha`'s invite (`/new-project dl-test-alpha` again gives a fresh one): only that channel opens, with the welcome;
-   - as the client: `/help`, `/project`, `/add-github <your second GitHub account, or skip>`;
-   - write a few messages about a test app; as Boran, `/create-specs`; both run `/agree-specs`;
-   - as Boran, `/quote 0.01 <date>`; as the client, `/accept-quote`;
-   - as the client, `/set-payment-wallet <one of your own wallets>`, then `/pay`, scan the QR code with Phantom and pay 0.01 USDC. The bot should confirm by itself within about a minute; then `/receipt`;
-   - as Boran, `/start-development`, then `/confirm-delivery`; as the client, click Confirm delivery;
-   - `/progress`, `/request-update`, `/export`, `/report`, `/touches`.
+5. [ ] **Real-person check, about 2 minutes, when Ahmet Bey has time.** Run `/new-project dl-test-one` and send him only that invite. Check that only `#dl-test-one` opens, with the welcome and the Client role, and that `/help` and `/project` work for him. Everything else is covered by the automated journey test (`test/e2e/journey.test.ts`).
+   - [ ] **Later, Boran:** a real 0.01 USDC payment through `/pay` with Phantom, to confirm Phantom includes the reference.
 6. [ ] **Review the default quote terms** in `src/discord/texts.ts` (`quoteTerms`).
 7. [ ] **Deploy to Replit:** follow `DEPLOY.md`, and stop the copy on the Mac first. Redeem the Pro coupon (`replit.com/~?redeemCoupon=[code removed]`).
 8. [ ] **Hackathon admin:**
@@ -28,12 +22,10 @@ Freeze: **Wed 18 Nov, 6pm.** The client comes first, so bot work fits around the
    - [x] end-to-end test passed on `dl-test-tessl` (PR in about 70 s, 17 credits);
    - [ ] turn on the factory for the client's repo (the `tessl__factory-setup` skill, as for the test repo);
    - [ ] decide: limit Tessl to pull requests only (move its automations into `tessl.json`), and/or GitHub Pro to protect `main`.
-10. [ ] **Clean up test leftovers when done:**
-    - the `#dl-test-*` channels;
-    - the private repos `boranfurkan/dl-test-*`.
-
-    `dl-test-gamma`'s history shows each scripted test step as a `test.stage_forced` event.
-11. [ ] Delete the Cloudflare API token (dashboard → My Profile → API Tokens).
+10. [x] **Test leftovers cleaned up (9 Nov):**
+    - Discord channels, the database and the test repos were reset (backup in `backups/`);
+    - `boranfurkan/dl-test-tessl` stays on purpose, for `scripts/tessl-e2e.ts`.
+11. [ ] Delete the Cloudflare API token (dashboard → My Profile → API Tokens), and the old fine-grained GitHub token if it still exists.
 
 Done earlier:
 - [x] env values collected;
@@ -232,7 +224,8 @@ Skills: the `tessl__*` skills, `gemini-api-dev`, `surrealdb-agent-memory-docs`.
   - a failed issue can be retried with Approve.
   - Limit: 10 per 30 days.
   - Reporting the pull request back is not built yet.
-- [ ] Turn on the Tessl factory for a client repo, and set its environment to pull-request access. **Boran, in the Tessl web app.**
+- [ ] Turn on the Tessl factory for a real client repo: scriptable with the `tessl__factory-setup` skill, done for `dl-test-tessl` on 9 Nov. Decide first whether to limit it to pull requests only (see Boran, step 9).
+- [ ] Report Tessl's pull request back into the Discord channel. Not built yet: Boran sees it on GitHub for now.
 - [x] Agent Memory through REST, one scope per project (`discordlancer/project/<name>`), registered on first use:
   - **written** when specs are agreed, a quote is accepted, a payment arrives, a delivery is confirmed, and a change is triaged or approved;
   - **recalled** in `/create-specs`, `/progress` and triage.
