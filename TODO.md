@@ -4,22 +4,40 @@ Freeze: **Wed 18 Nov, 6pm.** The client comes first, so bot work fits around the
 
 ## Boran
 
-- [ ] **Ask your referrer for an intro today.** Keep the message for the audit, and log the ask as a touch.
-- [x] Collect the env values. All 22 checks in `scripts/check-env.mjs` passed on 9 Nov.
-- [x] Discord server and bot: both intents on, all 11 permissions.
-- [x] SurrealDB instance (`freelance-management-db`) and Agent Memory context.
-- [ ] **GitHub token:** set Repository permissions → Administration to **Read and write** (Settings → Developer settings → Fine-grained tokens → your token → Edit). The token value doesn't change. Needed by `/add-github`.
-- [ ] **Discord:** give the bot's role **Pin Messages** (Server Settings → Roles). Needed to pin specs.
-- [ ] **Review the default quote terms** in `src/discord/texts.ts`.
-- [ ] **Morning tests** that need a second Discord account: see "Still needs Boran" under each phase.
-- [ ] **Clean up test leftovers when done:**
-  - the `#dl-test-*` channels;
-  - the private repos `boranfurkan/dl-test-*`.
-- [ ] Redeem the Replit Pro coupon (`replit.com/~?redeemCoupon=[code removed]`). Needed by phase 3.
-- [ ] Tell the organisers you're solo now.
-- [ ] Declare your Solana wallet to the organisers before the first payment.
-- [ ] Delete the Cloudflare API token (dashboard → My Profile → API Tokens).
-- [ ] Before phase 7: install the Tessl GitHub App on `boranfurkan` with All repositories, and decide on GitHub Pro (see `PLAN.md`, Change requests).
+**Morning of Mon 9 Nov, in this order.** The bot was built overnight (phases 1, 2 and 4 to 7). It is running on the Mac until it is deployed.
+
+1. [ ] **Ask your referrer for an intro.** Keep the message for the audit, and log the ask as a touch.
+2. [ ] **GitHub token:** set Repository permissions → Administration to **Read and write** (Settings → Developer settings → Fine-grained tokens → your token → Edit). The token value doesn't change. Needed by `/add-github`.
+3. [ ] **Discord:** give the bot's role **Pin Messages** (Server Settings → Roles). Needed to pin specs.
+4. [ ] Run `npm run check:env`: it should show 23 passed.
+5. [ ] **Second-account test on `dl-test-alpha`,** playing the client with another Discord account:
+   - join with `dl-test-alpha`'s invite (`/new-project dl-test-alpha` again gives a fresh one): only that channel opens, with the welcome;
+   - as the client: `/help`, `/project`, `/add-github <your second GitHub account, or skip>`;
+   - write a few messages about a test app; as Boran, `/create-specs`; both run `/agree-specs`;
+   - as Boran, `/quote 0.01 <date>`; as the client, `/accept-quote`;
+   - as the client, `/set-payment-wallet <one of your own wallets>`, then `/pay`, scan the QR code with Phantom and pay 0.01 USDC. The bot should confirm by itself within about a minute; then `/receipt`;
+   - as Boran, `/start-development`, then `/confirm-delivery`; as the client, click Confirm delivery;
+   - `/progress`, `/request-update`, `/export`, `/report`, `/touches`.
+6. [ ] **Review the default quote terms** in `src/discord/texts.ts` (`quoteTerms`).
+7. [ ] **Deploy to Replit:** follow `DEPLOY.md`, and stop the copy on the Mac first. Redeem the Pro coupon (`replit.com/~?redeemCoupon=[code removed]`).
+8. [ ] **Hackathon admin:**
+   - tell the organisers you're solo;
+   - declare your Solana receiving wallet before the first payment.
+9. [ ] **Before using Approve on a change request:**
+   - install the Tessl GitHub App on `boranfurkan` with All repositories;
+   - turn on the factory for that repo;
+   - decide on GitHub Pro to protect `main` (see `PLAN.md`, Change requests).
+10. [ ] **Clean up test leftovers when done:**
+    - the `#dl-test-*` channels;
+    - the private repos `boranfurkan/dl-test-*`.
+
+    `dl-test-gamma`'s history shows each scripted test step as a `test.stage_forced` event.
+11. [ ] Delete the Cloudflare API token (dashboard → My Profile → API Tokens).
+
+Done earlier:
+- [x] env values collected;
+- [x] Discord server and bot;
+- [x] SurrealDB instance and Agent Memory context.
 
 ## Build phases
 
