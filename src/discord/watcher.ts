@@ -38,7 +38,7 @@ export function startPaymentWatcher(client: Client, ctx: BotContext, intervalMs 
   return () => clearInterval(timer);
 }
 
-async function checkRequest(client: Client, ctx: BotContext, request: PaymentRequest, judged: Set<string>): Promise<void> {
+export async function checkRequest(client: Client, ctx: BotContext, request: PaymentRequest, judged: Set<string>): Promise<void> {
   const project = await getProject(ctx.db, request.project);
   if (!project || project.stage !== 'quote_accepted' || !project.client_wallet) return;
   const guild = client.guilds.cache.get(ctx.env.DISCORD_GUILD_ID);
