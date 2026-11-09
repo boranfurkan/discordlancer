@@ -29,7 +29,7 @@ All live in `.claude/skills/`. Vendor skills are recorded in `skills-lock.json`.
 |---|---|---|
 | `typescript-node` | Code style, the long-running process, API limits, money rules, audit logging, tests | Written |
 | `surreal-data` | Our schema, append-only history, connecting to SurrealDB 4, queries, tests | Written |
-| `discord-bot` | discord.js conventions: commands, permissions, buttons, deferring slow replies, invite tracking | To write in phase 2 |
+| `discord-bot` | discord.js conventions: commands, the gate, replies and errors, permissions, invites and join tracking, testing in the server | Written |
 
 **Tessl**
 

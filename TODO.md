@@ -8,6 +8,11 @@ Freeze: **Wed 18 Nov, 6pm.** The client comes first, so bot work fits around the
 - [x] Collect the env values. All 22 checks in `scripts/check-env.mjs` passed on 9 Nov.
 - [x] Discord server and bot: both intents on, all 11 permissions.
 - [x] SurrealDB instance (`freelance-management-db`) and Agent Memory context.
+- [ ] **GitHub token:** set Repository permissions → Administration to **Read and write** (Settings → Developer settings → Fine-grained tokens → your token → Edit). The token value doesn't change. Needed by `/add-github`.
+- [ ] **Morning tests** that need a second Discord account: see "Still needs Boran" under each phase.
+- [ ] **Clean up test leftovers when done:**
+  - the `#dl-test-*` channels;
+  - the private repos `boranfurkan/dl-test-*`.
 - [ ] Redeem the Replit Pro coupon (`replit.com/~?redeemCoupon=[code removed]`). Needed by phase 3.
 - [ ] Tell the organisers you're solo now.
 - [ ] Declare your Solana wallet to the organisers before the first payment.
@@ -58,18 +63,32 @@ Skills: `typescript-node`, `surrealdb-js`, `surrealql`. Context7 for discord.js 
 
 Skills: `typescript-node`, `surreal-data`. Context7 for discord.js and Octokit.
 
-- [ ] `/new-project name`. Running it twice must not create a second channel, invite or repo. It does four things:
+- [x] `/new-project name`. Running it twice must not create a second channel, invite or repo. It does four things:
   - checks the name;
   - creates the channel under `Projects`, hidden from `@everyone`;
   - creates a single-use, 7-day invite;
   - creates a private repo with a README.
-- [ ] Invite cache and join tracking: the joined member gets channel access and a welcome with the privacy note.
-- [ ] `/link-client`, `/add-github`, `/project`, `/cancel`, `/archive`.
-- [ ] Guards:
+
+  Running it again on a project still waiting for its client issues a fresh invite and retires the old one.
+- [x] Join tracking: the joined member gets channel access and a welcome with the privacy note. It reads invites fresh from Discord rather than caching them.
+- [x] `/link-client`, `/add-github`, `/project`, `/cancel`, `/archive`.
+- [x] Guards:
   - owner-only commands;
   - commands that only work in a project channel;
+  - a client only in their own project;
   - stage checks, each with a clear private reply.
-- [ ] Write the `discord-bot` skill: intents, deferring replies, permissions per member, invite tracking, guards.
+- [x] Write the `discord-bot` skill.
+
+**Tried live on 9 Nov (overnight):**
+- `/new-project` (new, and again to renew the invite);
+- stage-aware `/help`;
+- `/project`;
+- `/cancel` with False and with True;
+- `/archive`.
+
+**Still needs Boran:**
+- **Give the GitHub token Administration "Read and write".** `/add-github` is blocked until then; the env check now tests this.
+- **Second-account test:** join with the `dl-test-alpha` invite and check it opens only that channel with the welcome. Then try `/add-github` and `/project` as the client.
 
 **Done when:** in our server, with a second Discord account playing the client:
 - a project is created;

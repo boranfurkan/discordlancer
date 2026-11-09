@@ -8,6 +8,7 @@ Read `PLAN.md` for the design, `TODO.md` for the current phase, and `NOTES.md` f
 
 - `typescript-node`: our code style, API limits, money rules, audit logging and tests. Read it before writing code.
 - `surreal-data`: our schema, append-only history, and SurrealDB 4 quirks. Read it before touching `src/db/`.
+- `discord-bot`: adding commands, the command gate, replies and errors, channels, invites and joins, testing in the server. Read it before touching `src/discord/`.
 - Vendor skills: `surrealdb-js`, `surrealql`, `surrealdb-agent-memory-docs`, `gemini-api-dev`, `tavily-sdk`, `solana-dev`.
 - Tessl skills (`tessl__*`): the factory behind `/request-update`, and GitHub issues for it.
 - For discord.js and other libraries, check current docs through the `context7` MCP server before relying on memory. For Solana, use `solana-docs`.
