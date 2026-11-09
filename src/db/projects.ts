@@ -151,3 +151,8 @@ export async function updateProject(
     { id: project.id, changes, event: eventContent(event, project.id) },
   );
 }
+
+export async function getProject(db: Surreal, id: RecordId<'project'>): Promise<Project | undefined> {
+  const [rows] = await db.query<[unknown[]]>('SELECT * FROM $id', { id });
+  return parseRows(rows)[0];
+}

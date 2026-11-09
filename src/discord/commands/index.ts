@@ -4,9 +4,11 @@ import { archive, cancel } from './close.js';
 import { help } from './help.js';
 import { linkClient } from './linkClient.js';
 import { newProject } from './newProject.js';
+import { paid, pay, receipt, startDevelopment } from './pay.js';
 import { projectInfo } from './project.js';
 import { acceptQuote, quote } from './quote.js';
 import { agreeSpecs, createSpecs } from './specs.js';
+import { setPaymentWallet, wallet } from './wallet.js';
 
 export const COMMANDS: readonly Command[] = [
   help,
@@ -18,6 +20,12 @@ export const COMMANDS: readonly Command[] = [
   agreeSpecs,
   quote,
   acceptQuote,
+  setPaymentWallet,
+  wallet,
+  pay,
+  paid,
+  receipt,
+  startDevelopment,
   cancel,
   archive,
 ];

@@ -8,6 +8,8 @@ import { COMMANDS } from './discord/commands/index.js';
 import { onMemberAdd } from './discord/joins.js';
 import { createGemini } from './services/gemini.js';
 import { createGitHub } from './services/github.js';
+import { createSolana } from './services/solana.js';
+import { startPaymentWatcher } from './discord/watcher.js';
 import { registerCommands } from './discord/register.js';
 import { loadEnv, secretValues } from './env.js';
 import { log, registerSecrets } from './log.js';
@@ -30,11 +32,20 @@ async function main(): Promise<void> {
   await registerCommands(env, COMMANDS);
 
   const client = createDiscordClient();
-  const ctx = { env, db, github: createGitHub(env), gemini: createGemini(env), commands: COMMANDS };
+  let stopWatcher: (() => void) | undefined;
+  const ctx = {
+    env,
+    db,
+    github: createGitHub(env),
+    gemini: createGemini(env),
+    solana: createSolana(env),
+    commands: COMMANDS,
+  };
 
   client.once(Events.ClientReady, (ready) => {
     log.info('discord ready', { user: ready.user.tag, guild: env.DISCORD_GUILD_ID });
     void safeRecord(ctx, { actor: 'bot', action: 'bot.started', outcome: 'ok' });
+    stopWatcher = startPaymentWatcher(client, ctx);
   });
   handleInteractions(client, ctx);
   client.on(Events.GuildMemberAdd, (member) => {
@@ -43,6 +54,7 @@ async function main(): Promise<void> {
 
   const shutdown = async (signal: string) => {
     log.info('shutting down', { signal });
+    stopWatcher?.();
     await client.destroy();
     await closeDatabase(db);
     process.exit(0);

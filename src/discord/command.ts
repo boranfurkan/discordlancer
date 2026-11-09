@@ -6,12 +6,14 @@ import type { Stage } from '../domain/stages.js';
 import type { Env } from '../env.js';
 import type { GeminiApi } from '../services/gemini.js';
 import type { GitHubApi } from '../services/github.js';
+import type { SolanaApi } from '../services/solana.js';
 
 export interface BotContext {
   env: Env;
   db: Surreal;
   github: GitHubApi;
   gemini: GeminiApi;
+  solana: SolanaApi;
   commands: readonly Command[];
 }
 
