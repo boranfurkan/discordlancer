@@ -155,8 +155,8 @@ Commands are registered on our server only, so changes appear instantly. Every c
 | `/accept-quote` | Client | 4 | Accepts the current quote version. Posting a quote already counts as Boran's acceptance |
 | `/set-payment-wallet address` | Client | 5 | Declares the Solana wallet the client will pay from, before paying |
 | `/wallet` | Both | 5 | Boran's receiving address and the network: USDC on Solana |
-| `/pay` | Client | 5 | Creates a Solana Pay request for the amount due and posts its QR code. The bot then watches for the payment |
-| `/paid signature` | Client | 5 | Fallback if the client paid without scanning the QR: the bot checks that transaction |
+| `/pay` | Both | 5 | Creates a Solana Pay request for the amount due and posts its QR code. The bot then watches for the payment |
+| `/paid signature` | Both | 5 | Fallback if the client paid without scanning the QR: the bot checks that transaction |
 | `/receipt` | Both | 5 | A receipt for a verified payment |
 | `/start-development` | Boran | 5 | Marks the start of building. Needs a verified payment |
 | `/confirm-delivery` | Both | 6 | Boran marks it delivered, then the client confirms with a button |
@@ -196,7 +196,7 @@ Based on the `solana-dev` skill's payment guidance.
    - the client's declared wallet's USDC balance fell by the same amount;
    - the signature hasn't been used before (a unique index).
 5. **Record it once:** mark the request paid and write the payment and its event in one transaction. Then post the confirmation and receipt, and remind Boran to report the sale.
-6. **Treat silence carefully.** No result from the RPC isn't proof that nobody paid. Pending requests stay open, and only Boran can expire one.
+6. **Treat silence carefully.** No result from the RPC isn't proof that nobody paid, so requests never expire for lack of an answer. The only automatic expiry: opening a request for a newer quote expires open requests for older quotes, so a superseded amount can't be paid.
 7. **`/paid signature`** is the fallback for a manual send that has no reference. It runs the same checks on that one transaction.
 
 The bot never holds a private key, signs or sends anything. It only reads the chain.

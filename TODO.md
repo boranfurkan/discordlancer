@@ -151,9 +151,9 @@ With no second account, the project was moved past the client's steps by a scrip
 
 Skills: `solana-dev` (`payments.md`, `rpc-quick-lookups.md`, `kit/*`), the `solana-docs` MCP server, `surreal-data`.
 
-- [ ] `/set-payment-wallet` (checks the address), `/wallet`.
-- [ ] `/pay`: a payment request with a unique reference, plus the Solana Pay link and QR code.
-- [ ] The watcher and `/paid signature`, with every check in `PLAN.md`:
+- [x] `/set-payment-wallet` (client only; checks it's a real wallet, not a token account or program), `/wallet`.
+- [x] `/pay`: a payment request with a unique reference, plus the Solana Pay link and QR code. Running it again reuses the open request; a request for an older quote is expired automatically.
+- [x] The watcher (every 20 seconds) and `/paid signature`, with every check in `PLAN.md`:
   - `finalized`;
   - `maxSupportedTransactionVersion: 1`;
   - USDC mint;
@@ -161,16 +161,25 @@ Skills: `solana-dev` (`payments.md`, `rpc-quick-lookups.md`, `kit/*`), the `sola
   - the amount;
   - a unique signature.
 
-  Each payment is recorded once.
-- [ ] `/receipt`, `/start-development`.
-- [ ] Tests with recorded mainnet transactions:
+  Each payment is recorded once, together with its request, the stage change and the event. A rejected transaction is reported once in `owner-desk`.
+- [x] `/receipt`, `/start-development`.
+- [x] Tests with a recorded mainnet transaction (addresses replaced):
   - a valid payment;
   - too little;
   - the wrong mint;
   - the wrong sender;
+  - the wrong recipient;
   - the same signature twice;
-  - a failed transaction.
-- [ ] **Live test:** pay 0.01 USDC from one of your wallets to the receiving wallet through the QR code, and check that Phantom includes the reference.
+  - a failed transaction;
+  - a missing reference.
+- [ ] **Live test (Boran):** with the second account as the client, declare one of your wallets, `/pay`, scan the QR code with Phantom and pay 0.01 USDC. Check that the bot confirms by itself within about a minute, and that `/receipt` shows it.
+
+**Tried live on 9 Nov (overnight)** on `dl-test-gamma`:
+- `/pay` made the request, the Solana Pay link and the QR code;
+- `/paid` with a real but unrelated mainnet transaction was refused ("no USDC reached the receiving wallet");
+- the watcher ran with no errors.
+
+The client steps were done by a labelled test script, using a throwaway wallet whose key was discarded. No money moved.
 
 **Done when:** the live test payment is found by itself, verified, recorded once and receipted.
 
