@@ -20,6 +20,8 @@ export const ProjectRow = z.object({
   client_id: z.string().optional(),
   client_github: z.string().optional(),
   client_wallet: z.string().optional(),
+  delivery_marked_at: toDate.optional(),
+  delivery_note: z.string().optional(),
   stage: z.enum(STAGES),
   created_at: toDate,
   updated_at: toDate,
@@ -98,6 +100,8 @@ export interface ProjectChanges {
   client_id?: string;
   client_github?: string;
   client_wallet?: string;
+  delivery_marked_at?: Date;
+  delivery_note?: string;
 }
 
 /**

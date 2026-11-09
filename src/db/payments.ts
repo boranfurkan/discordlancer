@@ -157,3 +157,8 @@ export async function paymentBySignature(db: Surreal, signature: string): Promis
   const [rows] = await db.query<[unknown[]]>('SELECT * FROM payment WHERE signature = $s LIMIT 1', { s: signature });
   return rows[0] === undefined ? undefined : PaymentRow.parse(rows[0]);
 }
+
+export async function allPayments(db: Surreal): Promise<Payment[]> {
+  const [rows] = await db.query<[unknown[]]>('SELECT * FROM payment ORDER BY verified_at');
+  return rows.map((row) => PaymentRow.parse(row));
+}

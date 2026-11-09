@@ -15,6 +15,8 @@ DEFINE FIELD OVERWRITE invite_code ON project TYPE option<string>;
 DEFINE FIELD OVERWRITE client_id ON project TYPE option<string>;
 DEFINE FIELD OVERWRITE client_github ON project TYPE option<string>;
 DEFINE FIELD OVERWRITE client_wallet ON project TYPE option<string>;
+DEFINE FIELD OVERWRITE delivery_marked_at ON project TYPE option<datetime>;
+DEFINE FIELD OVERWRITE delivery_note ON project TYPE option<string>;
 DEFINE FIELD OVERWRITE stage ON project TYPE string ASSERT $value IN [
   "created", "joined", "specs_agreed", "quote_accepted", "paid",
   "in_development", "delivered", "support", "cancelled", "archived"

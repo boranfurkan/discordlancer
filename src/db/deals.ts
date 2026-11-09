@@ -208,3 +208,29 @@ export async function agreedParties(db: Surreal, project: ProjectRef, kind: Agre
   );
   return new Set(rows.filter((party): party is Party => party === 'owner' || party === 'client'));
 }
+
+export async function listSpecs(db: Surreal, project: ProjectRef): Promise<Spec[]> {
+  const [rows] = await db.query<[unknown[]]>('SELECT * FROM spec WHERE project = $p ORDER BY version', { p: project.id });
+  return rows.map((row) => SpecRow.parse(row));
+}
+
+export async function listQuotes(db: Surreal, project: ProjectRef): Promise<Quote[]> {
+  const [rows] = await db.query<[unknown[]]>('SELECT * FROM quote WHERE project = $p ORDER BY version', { p: project.id });
+  return rows.map((row) => QuoteRow.parse(row));
+}
+
+export const AgreementRow = z.object({
+  kind: z.enum(['spec', 'quote']),
+  version: z.number().int(),
+  party: z.enum(['owner', 'client']),
+  user_id: z.string(),
+  at: toDate,
+});
+export type Agreement = z.infer<typeof AgreementRow>;
+
+export async function listAgreements(db: Surreal, project: ProjectRef): Promise<Agreement[]> {
+  const [rows] = await db.query<[unknown[]]>('SELECT kind, version, party, user_id, at FROM agreement WHERE project = $p ORDER BY at', {
+    p: project.id,
+  });
+  return rows.map((row) => AgreementRow.parse(row));
+}

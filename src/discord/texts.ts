@@ -22,7 +22,7 @@ export const NEXT_STEP: Record<Stage, string> = {
   specs_agreed: `${OWNER_NAME} posts a quote with /quote.`,
   quote_accepted: 'The client declares their wallet with /set-payment-wallet, then pays with /pay.',
   paid: `${OWNER_NAME} starts building with /start-development.`,
-  in_development: 'Building. The client can check progress with /status.',
+  in_development: `Building. When it's ready, ${OWNER_NAME} marks it delivered with /confirm-delivery and the client confirms.`,
   delivered: 'Delivered. Small changes can be asked for with /request-update.',
   support: 'Small changes can be asked for with /request-update.',
   cancelled: 'This project was cancelled.',

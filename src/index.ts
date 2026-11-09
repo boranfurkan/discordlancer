@@ -5,6 +5,7 @@ import { closeDatabase, connectDatabase } from './db/client.js';
 import { applySchema } from './db/migrate.js';
 import { createDiscordClient, handleInteractions, safeRecord } from './discord/client.js';
 import { COMMANDS } from './discord/commands/index.js';
+import { CONFIRM_DELIVERY_BUTTON, onConfirmDeliveryButton } from './discord/commands/delivery.js';
 import { onMemberAdd } from './discord/joins.js';
 import { createGemini } from './services/gemini.js';
 import { createGitHub } from './services/github.js';
@@ -47,7 +48,7 @@ async function main(): Promise<void> {
     void safeRecord(ctx, { actor: 'bot', action: 'bot.started', outcome: 'ok' });
     stopWatcher = startPaymentWatcher(client, ctx);
   });
-  handleInteractions(client, ctx);
+  handleInteractions(client, ctx, { [CONFIRM_DELIVERY_BUTTON]: onConfirmDeliveryButton });
   client.on(Events.GuildMemberAdd, (member) => {
     void onMemberAdd(member, ctx);
   });

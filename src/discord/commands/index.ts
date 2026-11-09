@@ -1,6 +1,8 @@
 import type { Command } from '../command.js';
 import { addGithub } from './addGithub.js';
 import { archive, cancel } from './close.js';
+import { confirmDelivery } from './delivery.js';
+import { exportEvidence, report, touches } from './evidence.js';
 import { help } from './help.js';
 import { linkClient } from './linkClient.js';
 import { newProject } from './newProject.js';
@@ -26,6 +28,10 @@ export const COMMANDS: readonly Command[] = [
   paid,
   receipt,
   startDevelopment,
+  confirmDelivery,
+  exportEvidence,
+  report,
+  touches,
   cancel,
   archive,
 ];

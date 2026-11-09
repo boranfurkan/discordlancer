@@ -6,6 +6,7 @@ import {
   Events,
   GatewayIntentBits,
   MessageFlags,
+  type ButtonInteraction,
   type ChatInputCommandInteraction,
   type Interaction,
 } from 'discord.js';
@@ -30,10 +31,40 @@ export function createDiscordClient(): Client {
   });
 }
 
-export function handleInteractions(client: Client, ctx: BotContext): void {
+/** Button handlers, by custom ID. Each checks for itself who may press it. */
+export type ButtonHandler = (interaction: ButtonInteraction<'cached'>, ctx: BotContext) => Promise<void>;
+
+export function handleInteractions(client: Client, ctx: BotContext, buttons: Record<string, ButtonHandler> = {}): void {
   client.on(Events.InteractionCreate, (interaction) => {
-    void onInteraction(interaction, ctx);
+    if (interaction.isButton()) void onButton(interaction, ctx, buttons);
+    else void onInteraction(interaction, ctx);
   });
+}
+
+async function onButton(interaction: ButtonInteraction, ctx: BotContext, buttons: Record<string, ButtonHandler>): Promise<void> {
+  if (!interaction.inCachedGuild() || interaction.guildId !== ctx.env.DISCORD_GUILD_ID) return;
+  const handler = buttons[interaction.customId];
+  const base = {
+    actor: actorFor(interaction.user.id, ctx.env.DISCORD_OWNER_ID),
+    actorId: interaction.user.id,
+    action: `button.${interaction.customId}`,
+  } as const;
+  if (!handler) return;
+  try {
+    await handler(interaction, ctx);
+    await safeRecord(ctx, { ...base, outcome: 'ok', data: { channel_id: interaction.channelId } });
+  } catch (error) {
+    const known = error instanceof UserError || error instanceof StageConflictError;
+    if (!known) log.error('button failed', { button: interaction.customId, error });
+    const content = known ? (error as Error).message : 'Something went wrong on my side. It has been logged; please try again in a minute.';
+    try {
+      if (interaction.replied || interaction.deferred) await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
+      else await interaction.reply({ content, flags: MessageFlags.Ephemeral });
+    } catch (replyError) {
+      log.error('could not reply to a button', { error: replyError });
+    }
+    await safeRecord(ctx, { ...base, outcome: known ? 'refused' : 'failed', data: { channel_id: interaction.channelId } });
+  }
 }
 
 /** Recording must never break a command, so a failed write is logged and dropped. */

@@ -67,3 +67,10 @@ export function formatDeadline(deadline: Date): string {
 export function isAfterFreeze(deadline: Date): boolean {
   return deadline.getTime() > FREEZE.getTime();
 }
+
+/** Midnight at the start of today in London, as a UTC instant. */
+export function londonDayStart(now: Date = new Date()): Date {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  return londonToUtc(get('year'), get('month'), get('day'), 0, 0);
+}

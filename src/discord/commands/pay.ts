@@ -161,6 +161,8 @@ export const startDevelopment: Command = {
       action: 'development.started',
       outcome: 'ok',
     });
-    await run.interaction.reply(`${OWNER_NAME} has started building **${project.name}**. Check progress any time with /status.`);
+    await run.interaction.reply(
+      `${OWNER_NAME} has started building **${project.name}**. When it's ready, ${OWNER_NAME} marks it delivered with /confirm-delivery and you confirm.`,
+    );
   },
 };
