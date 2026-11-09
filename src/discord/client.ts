@@ -36,9 +36,13 @@ export type ButtonHandler = (interaction: ButtonInteraction<'cached'>, ctx: BotC
 
 export function handleInteractions(client: Client, ctx: BotContext, buttons: Record<string, ButtonHandler> = {}): void {
   client.on(Events.InteractionCreate, (interaction) => {
-    if (interaction.isButton()) void onButton(interaction, ctx, buttons);
-    else void onInteraction(interaction, ctx);
+    void routeInteraction(interaction, ctx, buttons);
   });
+}
+
+/** Handles one interaction to completion. The bot calls it per event; tests await it. */
+export function routeInteraction(interaction: Interaction, ctx: BotContext, buttons: Record<string, ButtonHandler> = {}): Promise<void> {
+  return interaction.isButton() ? onButton(interaction, ctx, buttons) : onInteraction(interaction, ctx);
 }
 
 async function onButton(interaction: ButtonInteraction, ctx: BotContext, buttons: Record<string, ButtonHandler>): Promise<void> {
