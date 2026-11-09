@@ -11,7 +11,6 @@ Freeze: **Wed 18 Nov, 6pm.** The client comes first, so bot work fits around the
 - [ ] Tell the organisers you're solo now.
 - [ ] Declare your Solana wallet to the organisers before the first payment.
 - [ ] Delete the Cloudflare API token (dashboard → My Profile → API Tokens).
-- [ ] Decide whether to delete the remaining Google API key, "sample".
 
 ## Build phases
 
