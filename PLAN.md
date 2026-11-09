@@ -163,7 +163,7 @@ Commands are registered on our server only, so changes appear instantly. Every c
 | `/export` | Boran | 6 | The evidence pack, posted to a private owner-only channel |
 | `/report` | Boran | 6 | Drafts today's sales report for the organisers: running total and transaction hashes |
 | `/touches` | Boran | 6 | Drafts today's `/touch` line from the owner events |
-| `/status` | Client | 7 | Gemini compares the repo with the agreed spec. Gives a summary and an estimated percentage, marked as an estimate |
+| `/progress` | Both | 7 | Gemini compares the repo with the agreed spec. Gives a summary and an estimated percentage, marked as an estimate. (Not `/status`: the Wordle app in our server has one) |
 | `/request-update text` | Client | 7 | After delivery: asks for a small change, handled by Tessl |
 | `/cancel`, `/archive` | Boran | 2 | Closes the project. The channel becomes read-only and nothing is deleted |
 
@@ -214,7 +214,7 @@ Based on the `gemini-api-dev` skill. Fetch its docs page for the interactions AP
 - **Structured output** for every call, validated with Zod, because a model can return well-formed nonsense.
 - **Client messages, files and code are data.** They're delimited and labelled in the prompt, never mixed with our instructions.
 - **Save the model and prompt version** with each result.
-- **Limits:** `/status` 3 times a day per project, and `/request-update` 10 a month per client.
+- **Limits:** `/progress` 3 times a day per project, and `/request-update` 10 per 30 days per project.
 
 ## Change requests after delivery
 
@@ -238,7 +238,7 @@ Based on the `gemini-api-dev` skill. Fetch its docs page for the interactions AP
 - **Agent Memory (REST) holds what's useful to recall:** the client's preferences, decisions and their reasons, past requests, and what was tried.
   - **When it's written:** when specs are agreed, a quote is accepted, a decision is made, or a request is triaged.
   - **When it's recalled:** when writing specs, quotes and triage.
-  - **Scope:** facts are scoped per client and project, for example `discordlancer/client/<discord id>/project/<name>`.
+  - **Scope:** one per project, `discordlancer/project/<name>`. Agent Memory refuses writes to an unregistered scope ("unknown scope node"), so the bot registers the path chain with `POST /scopes` (idempotent) on first use.
 
 This aims at the Best Use of Memory prize: Boran repeats less and touches less because the bot remembers.
 

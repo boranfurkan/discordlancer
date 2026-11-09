@@ -204,15 +204,35 @@ The client steps were done by a labelled test script, using a throwaway wallet w
 
 Skills: the `tessl__*` skills, `gemini-api-dev`, `surrealdb-agent-memory-docs`.
 
-- [ ] `/status`: reads the repo, compares it with the agreed spec, gives an estimate marked as one. Limit: 3 a day.
-- [ ] `/request-update`:
-  - triage;
-  - Boran approves with a button;
-  - an issue, then the `tessl` label;
-  - the bot reports the pull request.
-  - Limit: 10 a month.
-- [ ] Turn on the Tessl factory for the client repo, and set its environment to pull-request access.
-- [ ] Agent Memory through REST: write at key moments, recall when writing specs, quotes and triage.
+- [x] `/progress` (renamed from `/status`, because the Wordle app in our server already has a `/status`): reads the repo's default branch (README, manifest, source; at most 40 files and 300 KB), compares it with the agreed spec, gives an estimate marked as one. Limit: 3 a day per project.
+- [x] `/request-update`:
+  - Gemini triage: small, needs info, or needs a quote;
+  - Boran approves or declines with buttons (owner only);
+  - approving opens an issue, then adds the `tessl` label in a second call;
+  - a failed issue can be retried with Approve.
+  - Limit: 10 per 30 days.
+  - Reporting the pull request back is not built yet.
+- [ ] Turn on the Tessl factory for a client repo, and set its environment to pull-request access. **Boran, in the Tessl web app.**
+- [x] Agent Memory through REST, one scope per project (`discordlancer/project/<name>`), registered on first use:
+  - **written** when specs are agreed, a quote is accepted, a payment arrives, a delivery is confirmed, and a change is triaged or approved;
+  - **recalled** in `/create-specs`, `/progress` and triage.
+
+  Memory is best-effort: a failure is logged and never stops a command.
 - [ ] Optional: connect the Agent Memory MCP server for development.
+
+**Tried live on 9 Nov (overnight)** on `dl-test-gamma`:
+- `/progress` gave "about 0%", correctly, with the spec's features listed as still to do;
+- a small request was triaged as small and then declined with the button;
+- a bigger request (online deposits, loyalty points) was triaged as needing a quote;
+- memory scopes were registered, and memory writes and recalls succeeded.
+
+**Approve was not clicked live:** it adds the `tessl` label, which could start a paid Tessl run. It is covered by tests with a fake GitHub.
+
+**Still needs Boran:**
+- **Before using Approve for real:**
+  - install the Tessl GitHub App;
+  - turn on the factory for that repo;
+  - decide on GitHub Pro (protecting `main`).
+- **Then try Approve** on a test repo, and check that Tessl opens a pull request.
 
 **Done when:** a test change request becomes a Tessl pull request on a test repo, and a recalled fact shows up in a new spec.
