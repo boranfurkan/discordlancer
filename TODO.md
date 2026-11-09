@@ -23,10 +23,11 @@ Freeze: **Wed 18 Nov, 6pm.** The client comes first, so bot work fits around the
 8. [ ] **Hackathon admin:**
    - tell the organisers you're solo;
    - declare your Solana receiving wallet before the first payment.
-9. [ ] **Before using Approve on a change request:**
-   - install the Tessl GitHub App on `boranfurkan` with All repositories;
-   - turn on the factory for that repo;
-   - decide on GitHub Pro to protect `main` (see `PLAN.md`, Change requests).
+9. [ ] **Before using Approve on a real client's change request:**
+   - [x] Tessl GitHub App on `boranfurkan`, reaching all repos (checked 9 Nov);
+   - [x] end-to-end test passed on `dl-test-tessl` (PR in about 70 s, 17 credits);
+   - [ ] turn on the factory for the client's repo (the `tessl__factory-setup` skill, as for the test repo);
+   - [ ] decide: limit Tessl to pull requests only (move its automations into `tessl.json`), and/or GitHub Pro to protect `main`.
 10. [ ] **Clean up test leftovers when done:**
     - the `#dl-test-*` channels;
     - the private repos `boranfurkan/dl-test-*`.

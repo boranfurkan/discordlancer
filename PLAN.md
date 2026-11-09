@@ -271,8 +271,8 @@ This aims at the Best Use of Memory prize: Boran repeats less and touches less b
 ## Open questions
 
 - **Tessl:**
-  - Does an issue created with the label already on it start a run? The plan adds the label in a second call to be safe.
-  - What does a typical run cost?
+  - ~~Does adding the label start a run?~~ **Yes** (tested 9 Nov): the bot adds `tessl` in a second call, and the run started 1.4 seconds later.
+  - ~~What does a run cost?~~ About **17 credits** for a one-line change (tested 9 Nov); the pull request arrived in about 70 seconds.
 - **GitHub Pro** for protecting `main`: decide before phase 7.
 - **Replit's Node version:** check when deploying.
 - **Phantom and the reference:** does Phantom include the reference in a Solana Pay transfer? Expected yes. Test with a 0.01 USDC payment between your own wallets before the first client.

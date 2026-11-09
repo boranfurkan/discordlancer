@@ -45,6 +45,17 @@ These drive `/request-update` in phase 7, and help set up the factory on a clien
 
 The Tessl registry had no official docs packages for our libraries, only community skills, so none were added.
 
+**Tessl factory, as set up on 9 Nov:**
+- **GitHub App:** the Tessl agent's app is installed on `boranfurkan` (since 6 Nov) and reaches every repo, including new ones. A token check for a brand-new repo passed.
+- **Workspace and credits:** the workspace is `furkans-factory`, on the free plan, with about 30,500 credits.
+- **Test repo:** `boranfurkan/dl-test-tessl` has a Tessl project and Ticket to PR turned on. That's four automations: Implement ticket, Shepherd PR, Follow ticket changes and Merge conflict sweep. They're started by issues labelled `tessl`, and Code Review is off.
+- **Turning on a client repo** is scriptable with the `tessl__factory-setup` skill, which works through `tessl api`: create the project, check the app can reach the repo, then POST `/experimental/projects/<id>/factory/ticket-to-pr`. No web app step is needed.
+- **The built-in automations run with GitHub write access,** in environments Tessl creates; that can't be changed on them. To limit a client repo to pull requests only, move them into the repo's `tessl.json` (the `tessl__change-factory` skill) and set the environment's GitHub access to `pull-requests`.
+- **A label added in a second call does start a run:** the run was created 1.4 seconds after the bot added `tessl`.
+- **First real run (9 Nov):** PR #2 on `tessl/issue-1`, about 70 seconds after the label. The change was exactly one correct line, `main` was untouched, and it cost about 17 credits.
+- **Closing a ticket also starts runs** ("Follow ticket changes"). **Commenting on a Tessl pull request starts a "Shepherd PR" run.** Both spend credits, so close test tickets without commenting.
+- **`npx tsx scripts/tessl-e2e.ts --repo boranfurkan/dl-test-tessl`** reruns the real end-to-end check: an Approve-style issue, then waiting for Tessl's pull request. It spends credits.
+
 ## MCP servers
 
 In `.mcp.json`, with no keys. Claude Code asks you to approve them the first time a session starts in this folder.
