@@ -6,6 +6,7 @@ import { moveStage } from '../../db/projects.js';
 import { log } from '../../log.js';
 import { SPEC_PROMPT_VERSION, SPEC_SCHEMA, SPEC_SYSTEM, SpecOutput } from '../../prompts/specs.js';
 import { GeminiError, SPEC_MODEL } from '../../services/gemini.js';
+import { projectScope, safeRecall, safeRemember } from '../../services/memory.js';
 import { requireProject, UserError, type Command } from '../command.js';
 import { OWNER_NAME } from '../guards.js';
 import { fitMessage } from '../texts.js';
@@ -35,7 +36,8 @@ export const createSpecs: Command = {
       throw new UserError('There are no messages to write specs from yet. Talk about the project here first.');
     }
     const previous = await latestSpec(ctx.db, project);
-    const { input, plan } = await buildSpecInput(messages, previous);
+    const memory = await safeRecall(ctx.memory, projectScope(project.name), 'Decisions, preferences and constraints agreed for this project');
+    const { input, plan } = await buildSpecInput(messages, previous, memory);
 
     let output;
     try {
@@ -132,6 +134,7 @@ export const agreeSpecs: Command = {
         data: { version: spec.version },
       });
       await interaction.reply(`Both sides agreed to **spec v${spec.version}**. Next, ${OWNER_NAME} posts a quote with /quote.`);
+      await safeRemember(ctx.memory, projectScope(project.name), `Both sides agreed spec v${spec.version} for ${project.name}:\n${spec.markdown.slice(0, 3_000)}`);
       return;
     }
     const waitingFor = party === 'owner' ? (project.client_id ? `<@${project.client_id}>` : 'the client') : OWNER_NAME;

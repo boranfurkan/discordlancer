@@ -17,6 +17,7 @@ import { log } from '../../log.js';
 import { ensureOwnerChannel } from '../channels.js';
 import { requireProject, UserError, type BotContext, type Command } from '../command.js';
 import { OWNER_NAME } from '../guards.js';
+import { projectScope, safeRemember } from '../../services/memory.js';
 
 export const CONFIRM_DELIVERY_BUTTON = 'dl:confirm-delivery';
 
@@ -45,6 +46,11 @@ async function confirm(ctx: BotContext, guild: Guild, project: Project, userId: 
     action: 'delivery.confirmed',
     outcome: 'ok',
   });
+  await safeRemember(
+    ctx.memory,
+    projectScope(project.name),
+    `${project.name} was delivered and the client confirmed it.${project.delivery_note ? ` Delivery note: ${project.delivery_note}` : ''}`,
+  );
   try {
     const owner = await ensureOwnerChannel(guild, ctx.env.DISCORD_OWNER_ID);
     await owner.send(

@@ -146,6 +146,7 @@ async function download(url: string): Promise<Buffer> {
 export async function buildSpecInput(
   messages: readonly ChatMessage[],
   previous: { version: number; markdown: string } | undefined,
+  memory = '',
 ): Promise<{ input: Part[]; plan: AttachmentPlan }> {
   const plan = planAttachments(messages);
   const fileTexts = new Map<string, string>();
@@ -156,6 +157,7 @@ export async function buildSpecInput(
   }
   const sections = [
     previous ? `<previous_spec version="${previous.version}">\n${previous.markdown}\n</previous_spec>` : 'There is no previous spec.',
+    memory ? `<memory>\n${memory}\n</memory>` : '',
     renderConversation(messages, plan, fileTexts),
     plan.images.length ? `The ${plan.images.length} image(s) below are the attachments numbered in the conversation, in order.` : '',
   ].filter(Boolean);

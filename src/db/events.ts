@@ -62,3 +62,12 @@ export async function eventsSince(db: Surreal, since: Date, actor?: Actor): Prom
   );
   return rows.map((row) => EventRow.parse(row));
 }
+
+/** How many `action` events this project has had since `since`, for daily limits. */
+export async function countEventsSince(db: Surreal, project: RecordId<'project'>, action: string, since: Date): Promise<number> {
+  const [rows] = await db.query<[number[]]>(
+    'SELECT VALUE count() FROM event WHERE project = $p AND action = $action AND at >= $since GROUP ALL',
+    { p: project, action, since },
+  );
+  return rows[0] ?? 0;
+}

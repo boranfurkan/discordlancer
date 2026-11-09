@@ -9,6 +9,7 @@ import { formatUsdc, MoneyError, parseUsdc } from '../../domain/money.js';
 import { requireProject, UserError, type Command } from '../command.js';
 import { OWNER_NAME } from '../guards.js';
 import { quoteTerms } from '../texts.js';
+import { projectScope, safeRemember } from '../../services/memory.js';
 
 const quoteDescription = 'Post a quote for the agreed spec, in USDC';
 
@@ -128,6 +129,11 @@ export const acceptQuote: Command = {
         `<@${interaction.user.id}> accepted **quote v${current.version}**: ${formatUsdc(current.amount_micro)} USDC, delivery by ${formatDeadline(current.deadline)}.`,
         'Next: declare the Solana wallet you will pay from with **/set-payment-wallet**, then pay with **/pay**.',
       ].join('\n'),
+    );
+    await safeRemember(
+      ctx.memory,
+      projectScope(project.name),
+      `Quote v${current.version} for ${project.name} was accepted: ${formatUsdc(current.amount_micro)} USDC, delivery by ${formatDeadline(current.deadline)}.`,
     );
   },
 };

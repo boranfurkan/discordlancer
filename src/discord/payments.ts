@@ -8,6 +8,7 @@ import type { Project } from '../db/projects.js';
 import { formatUsdc } from '../domain/money.js';
 import { explorerUrl, type Verdict } from '../domain/payment.js';
 import { log } from '../log.js';
+import { projectScope, safeRemember } from '../services/memory.js';
 import { ensureOwnerChannel } from './channels.js';
 import type { BotContext } from './command.js';
 import { OWNER_NAME } from './guards.js';
@@ -44,6 +45,7 @@ export async function settlePayment(
     },
   );
   if (result !== 'recorded') return result;
+  await safeRemember(ctx.memory, projectScope(project.name), `${project.name} was paid ${formatUsdc(verdict.amountMicro)} USDC on Solana, transaction ${verdict.signature}.`);
 
   const amount = formatUsdc(verdict.amountMicro);
   const link = explorerUrl(verdict.signature);

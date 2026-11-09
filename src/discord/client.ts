@@ -43,11 +43,14 @@ export function handleInteractions(client: Client, ctx: BotContext, buttons: Rec
 
 async function onButton(interaction: ButtonInteraction, ctx: BotContext, buttons: Record<string, ButtonHandler>): Promise<void> {
   if (!interaction.inCachedGuild() || interaction.guildId !== ctx.env.DISCORD_GUILD_ID) return;
-  const handler = buttons[interaction.customId];
+  const handler =
+    buttons[interaction.customId] ??
+    Object.entries(buttons).find(([key]) => key.endsWith(':') && interaction.customId.startsWith(key))?.[1];
   const base = {
     actor: actorFor(interaction.user.id, ctx.env.DISCORD_OWNER_ID),
     actorId: interaction.user.id,
-    action: `button.${interaction.customId}`,
+    // Prefix buttons carry an ID after the last colon; record the button's kind.
+    action: `button.${interaction.customId.split(':').slice(0, 2).join(':')}`,
   } as const;
   if (!handler) return;
   try {
