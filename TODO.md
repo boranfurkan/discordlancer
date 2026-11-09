@@ -9,6 +9,8 @@ Freeze: **Wed 18 Nov, 6pm.** The client comes first, so bot work fits around the
 - [x] Discord server and bot: both intents on, all 11 permissions.
 - [x] SurrealDB instance (`freelance-management-db`) and Agent Memory context.
 - [ ] **GitHub token:** set Repository permissions → Administration to **Read and write** (Settings → Developer settings → Fine-grained tokens → your token → Edit). The token value doesn't change. Needed by `/add-github`.
+- [ ] **Discord:** give the bot's role **Pin Messages** (Server Settings → Roles). Needed to pin specs.
+- [ ] **Review the default quote terms** in `src/discord/texts.ts`.
 - [ ] **Morning tests** that need a second Discord account: see "Still needs Boran" under each phase.
 - [ ] **Clean up test leftovers when done:**
   - the `#dl-test-*` channels;
@@ -111,23 +113,37 @@ Needed before the first invite goes to a real client, because join tracking need
 
 Skills: `gemini-api-dev` (fetch its interactions, structured output and image docs first), `surreal-data`, `discord-bot`. Optionally `tavily-sdk`.
 
-- [ ] `services/gemini.ts`:
+- [x] `services/gemini.ts`:
   - `store: false`;
   - `gemini-3.8-flash` for specs, `gemini-3.5-flash-lite` for small calls;
   - structured output checked with Zod;
-  - model and prompt version saved.
-- [ ] `/create-specs`:
-  - reads the channel since the project started, including images;
+  - model and prompt version saved;
+  - retries on bad output, 429 and 5xx, and a clear message when credits run out.
+- [x] `/create-specs`:
+  - reads the channel since the project started, including images and small text files;
   - writes spec version N with what changed and open questions;
-  - posts it as a `.md` file and pins it;
+  - posts it as a `.md` file and pins it (pinning needs the Pin Messages permission);
   - clears an earlier spec agreement.
-- [ ] `/agree-specs`, `/quote amount deadline` (warns after the freeze), `/accept-quote`. All are tied to a version.
-- [ ] Optional: Tavily lookups for third-party APIs named in the chat, added to the spec as clearly marked research notes.
-- [ ] Tests:
+- [x] `/agree-specs`, `/quote amount deadline` (London time, warns after the freeze), `/accept-quote`. All are tied to a version. Posting a quote counts as Boran's acceptance, so only the client runs `/accept-quote`.
+- [ ] Optional: Tavily lookups for third-party APIs named in the chat, added to the spec as clearly marked research notes. Not done yet.
+- [x] Tests:
   - version resets;
   - gates;
-  - quote amounts and deadlines;
+  - quote amounts and deadlines (GMT and BST);
   - Gemini output that fails validation.
+
+**Tried live on 9 Nov (overnight)** on `dl-test-gamma`:
+- a real Gemini spec from three test messages, posted with its file;
+- `/agree-specs` by Boran;
+- `/quote` with the after-freeze warning;
+- `/accept-quote` refused for Boran.
+
+With no second account, the project was moved past the client's steps by a script. Each move is recorded as a `test.stage_forced` event that says so.
+
+**Still needs Boran:**
+- **Give the bot "Pin Messages":** Server Settings → Roles → the bot's role. Discord split it out of Manage Messages. Until then, specs post but aren't pinned.
+- **Review the default quote terms** in `src/discord/texts.ts` (`quoteTerms`). They're a business decision.
+- **Second-account test:** the client runs `/agree-specs` and `/accept-quote`.
 
 **Done when:** a test project in our server goes from chat to agreed specs and an accepted quote.
 

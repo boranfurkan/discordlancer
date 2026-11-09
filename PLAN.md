@@ -149,10 +149,10 @@ Commands are registered on our server only, so changes appear instantly. Every c
 | `/link-client user` | Boran | 2 | Fallback: attaches a member to the project if invite tracking missed them |
 | `/project` | Both | 2 | Project card: stage, spec version, quote, payment, deadline, what's next |
 | `/add-github username` | Both | 2 | Adds the client's GitHub account to the repo with write access |
-| `/create-specs` | Boran | 4 | Gemini writes spec version N from the whole channel, plus "what changed since N-1" and open questions. Posted as a `.md` file and pinned |
+| `/create-specs` | Boran | 4 | Gemini writes spec version N from the whole channel, plus "what changed since N-1" and open questions. Posted as a `.md` file and pinned (the bot needs the Pin Messages permission) |
 | `/agree-specs` | Both | 4 | Agrees to the current spec version. Needs both people |
 | `/quote amount deadline` | Boran | 4 | Quote version N, in USDC, tied to the agreed spec version, with short terms |
-| `/accept-quote` | Both | 4 | Accepts the current quote version. Needs both people |
+| `/accept-quote` | Client | 4 | Accepts the current quote version. Posting a quote already counts as Boran's acceptance |
 | `/set-payment-wallet address` | Client | 5 | Declares the Solana wallet the client will pay from, before paying |
 | `/wallet` | Both | 5 | Boran's receiving address and the network: USDC on Solana |
 | `/pay` | Client | 5 | Creates a Solana Pay request for the amount due and posts its QR code. The bot then watches for the payment |
