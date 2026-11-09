@@ -1,0 +1,12 @@
+{
+  "name": "discordlancer",
+  "mode": "vendored",
+  "dependencies": {
+    "tessl/factory-setup": {
+      "version": "1.0.2"
+    }
+  },
+  "agents": [
+    "claude-code"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "solana-docs": {
+      "type": "http",
+      "url": "https://mcp.solana.com/mcp"
+    },
+    "tessl": {
+      "type": "stdio",
+      "command": "tessl",
+      "args": [
+        "mcp",
+        "start"
+      ]
+    }
+  }
+}
