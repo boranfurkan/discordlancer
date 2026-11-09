@@ -14,10 +14,10 @@ All live in `.claude/skills/`. Vendor skills are recorded in `skills-lock.json`.
 |---|---|---|---|
 | `surrealdb-js` | SurrealDB | The JS SDK for the database | 1 |
 | `surrealql` | SurrealDB | Schema and queries | 1 |
-| `surrealdb-agent-memory-docs` | SurrealDB | Agent Memory, aimed at the Best Use of Memory prize | 6 |
-| `gemini-api-dev` | Google Gemini | The Gemini API with an AI Studio key, through `@google/genai` | 3 |
-| `tavily-sdk` | Tavily | Calling Tavily from code | 3 |
-| `solana-dev` | Solana Foundation | `@solana/kit`, token accounts and payments, for the USDC check | 4 |
+| `surrealdb-agent-memory-docs` | SurrealDB | Agent Memory, aimed at the Best Use of Memory prize. We call its REST API, because the SDK is still an alpha | 7 |
+| `gemini-api-dev` | Google Gemini | The Gemini API with an AI Studio key, through `@google/genai` and the interactions API, always with `store: false` | 4 |
+| `tavily-sdk` | Tavily | Search guidance. We call the REST endpoint with `fetch`, not the SDK | 4 |
+| `solana-dev` | Solana Foundation | `@solana/kit`, Solana Pay requests with a reference key, and verifying USDC payments | 5 |
 
 - **`surrealdb-agent-memory-docs`** pre-approves read-only docs access: fetching `surrealdb.com`, `curl` to `surrealdb.com`, and `ssh surrealdb.sh`, which is SurrealDB's docs mirror.
 - **`solana-dev`** lists Rust, the Solana CLI and Anchor as requirements, but those are for writing on-chain programs. We only read transactions, so Node and `@solana/kit` are enough.
@@ -38,7 +38,7 @@ The `tessl/factory-setup` plugin is installed in the project, pinned in `tessl.j
 - **Issue skills:** `create-github-issue`, `create-linear-issue`.
 - **Repo and skill writing:** `prepare-repo`, `write-factory-skill`.
 
-These drive `/request-update` in phase 6, and help set up the factory on a client repo at delivery.
+These drive `/request-update` in phase 7, and help set up the factory on a client repo at delivery.
 - **Update:** `tessl install`.
 - **Files it manages:** the install added `@AGENTS.md` to `CLAUDE.md`, and `AGENTS.md` points to `.tessl/RULES.md`. Both are empty until a Tessl plugin adds rules.
 - **Global copy:** the same skills are also installed globally in `~/.claude/skills/`. You can remove that copy if it shows them twice.
@@ -62,11 +62,19 @@ In `.mcp.json`, with no keys. Claude Code asks you to approve them the first tim
 | Third-party Discord MCP servers | Unofficial, and they can act on the server |
 | Replit MCP | In beta, and it can create and change apps. Deploying is a one-time manual step |
 | GitHub MCP | `gh` is enough |
-| Agent Memory MCP | It can write to the memory context. Reconsider in phase 6 |
+| Agent Memory MCP | It can write to the memory context. Reconsider in phase 7 |
 | Tavily MCP | Claude Code already has web search, and this would spend credits |
 | Stripe MCP | It can change a live account and move money. Not used anyway |
 
 Never put API keys in `.mcp.json` or any other committed file.
+
+## Packages
+
+Exact versions, and why each was chosen, are in `PLAN.md` under "Stack and versions". The rule is to pin exact versions and prefer releases at least about two weeks old.
+
+There are two deliberate exceptions, both for SurrealDB 4:
+- `surrealdb` 2.2.2;
+- `@surrealdb/node` 3.2.0.
 
 ## Services and keys
 
