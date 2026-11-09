@@ -66,10 +66,17 @@ function fakeChannel(id: string, name: string, type = ChannelType.GuildText, par
 
 function fakeGuild(channels: FakeChannel[], liveInviteCodes: string[]) {
   const all = new Collection(channels.map((channel) => [channel.id, channel]));
+  const roleGrants: Array<{ user: string; role: string }> = [];
   return {
     id: GUILD,
-    roles: { everyone: { id: GUILD } },
-    members: { me: { id: 'bot' } },
+    roleGrants,
+    roles: { everyone: { id: GUILD }, fetch: async () => new Collection([['role-client', { id: 'role-client', name: 'Client' }]]) },
+    members: {
+      me: { id: 'bot' },
+      addRole: async ({ user, role }: { user: string; role: string }) => {
+        roleGrants.push({ user, role });
+      },
+    },
     invites: { fetch: async () => new Collection(liveInviteCodes.map((code) => [code, { code }])) },
     channels: {
       fetch: async (id?: string) => (id ? (all.get(id) ?? null) : all),
@@ -127,6 +134,7 @@ describe('a client joining through the invite', () => {
     expect(b.overwrites).toEqual([]);
     expect(a.sent[0]).toContain(`Welcome, <@${CLIENT}>!`);
     expect(a.sent[0]).toContain('**Privacy:**');
+    expect(guild.roleGrants).toEqual([{ user: CLIENT, role: 'role-client' }]);
   });
 
   it('ignores the owner and bots joining', async () => {

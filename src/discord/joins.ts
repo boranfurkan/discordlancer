@@ -3,10 +3,10 @@
 // hadn't expired) is theirs. The database is the source of truth, so this keeps
 // working across restarts. If it isn't clear, Boran links the client by hand.
 
-import { ChannelType, type GuildMember, type TextChannel } from 'discord.js';
+import { ChannelType, type Guild, type GuildMember, type TextChannel } from 'discord.js';
 import { listProjectsInStage, moveStage, type Project } from '../db/projects.js';
 import { log } from '../log.js';
-import { ensureOwnerChannel, grantClient, INVITE_MAX_AGE_SECONDS } from './channels.js';
+import { ensureOwnerChannel, giveClientRole, grantClient, INVITE_MAX_AGE_SECONDS } from './channels.js';
 import { safeRecord } from './client.js';
 import type { BotContext } from './command.js';
 import { welcomeText } from './texts.js';
@@ -43,6 +43,7 @@ function candidatesFrom(projects: readonly Project[]): JoinCandidate[] {
 /** Opens the project to its client and records the join. Shared with /link-client. */
 export async function attachClient(
   ctx: BotContext,
+  guild: Guild,
   project: Project,
   channel: TextChannel,
   clientId: string,
@@ -61,6 +62,11 @@ export async function attachClient(
     { client_id: clientId },
   );
   await channel.send(welcomeText(clientId));
+  try {
+    if (!(await giveClientRole(guild, clientId))) log.warn('no Client role to give; run scripts/setup-server.mjs');
+  } catch (error) {
+    log.warn('could not give the Client role', { error });
+  }
 }
 
 export async function onMemberAdd(member: GuildMember, ctx: BotContext): Promise<void> {
@@ -75,7 +81,7 @@ export async function onMemberAdd(member: GuildMember, ctx: BotContext): Promise
       const project = projects.find((candidate) => candidate.name === match.name);
       const channel = project ? await member.guild.channels.fetch(project.channel_id) : null;
       if (project && channel?.type === ChannelType.GuildText) {
-        await attachClient(ctx, project, channel, member.id, 'invite');
+        await attachClient(ctx, member.guild, project, channel, member.id, 'invite');
         return;
       }
     }

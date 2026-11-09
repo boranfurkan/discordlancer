@@ -31,7 +31,7 @@ export const linkClient: Command = {
     if (interaction.channel?.type !== ChannelType.GuildText) throw new UserError('Run this in the project channel.');
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    await attachClient(ctx, project, interaction.channel, user.id, 'linked', interaction.user.id);
+    await attachClient(ctx, interaction.guild, project, interaction.channel, user.id, 'linked', interaction.user.id);
     await interaction.editReply(`Linked <@${user.id}> as the client of **${project.name}**.`);
   },
 };

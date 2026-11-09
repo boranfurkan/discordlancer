@@ -26,6 +26,17 @@ The bot runs as one always-on process. Replit's **Reserved VM** keeps it on. Aut
    - The deployment logs show `database connected`, `commands registered` and `discord ready`.
    - In Discord, `/help` answers with your laptop closed.
 
+## Server setup
+
+`node scripts/setup-server.mjs [--icon path/to/icon.png]` sets up the server's public side. Run it once on a new server; it's safe to rerun after changing the wording. It handles:
+- the icon;
+- the Owner and Client roles;
+- trimmed `@everyone` permissions;
+- the read-only `#welcome` and `#announcements`;
+- join notices going to `owner-desk`.
+
+The bot's own role must be at the top of the role list. If the bot reports "Missing Permissions" when ordering roles, drag any role once in Server Settings → Roles and save, then rerun the script.
+
 ## Updating later
 
 Push to GitHub, pull the change in Replit, then republish. At startup the bot applies the database schema (safe to repeat) and registers its commands, so nothing else is needed.

@@ -13,6 +13,7 @@ import {
 } from 'discord.js';
 
 export const PROJECTS_CATEGORY = 'Projects';
+export const CLIENT_ROLE = 'Client';
 export const OWNER_CHANNEL = 'owner-desk';
 export const INVITE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 
@@ -124,4 +125,16 @@ function permissionName(flag: bigint): string {
   const entry = Object.entries(PermissionFlagsBits).find(([, bit]) => bit === flag);
   if (!entry) throw new Error(`Unknown permission bit ${flag}`);
   return entry[0];
+}
+
+/**
+ * Gives a member the Client role (created by scripts/setup-server.mjs). Best-effort:
+ * the role is a label, and channel access never depends on it.
+ */
+export async function giveClientRole(guild: Guild, userId: string): Promise<boolean> {
+  const roles = await guild.roles.fetch();
+  const role = roles.find((candidate) => candidate.name === CLIENT_ROLE);
+  if (!role) return false;
+  await guild.members.addRole({ user: userId, role: role.id, reason: 'Discordlancer: client joined their project' });
+  return true;
 }
