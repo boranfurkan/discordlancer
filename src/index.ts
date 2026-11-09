@@ -6,6 +6,7 @@ import { applySchema } from './db/migrate.js';
 import { createDiscordClient, handleInteractions, safeRecord } from './discord/client.js';
 import { COMMANDS } from './discord/commands/index.js';
 import { onMemberAdd } from './discord/joins.js';
+import { createGemini } from './services/gemini.js';
 import { createGitHub } from './services/github.js';
 import { registerCommands } from './discord/register.js';
 import { loadEnv, secretValues } from './env.js';
@@ -29,7 +30,7 @@ async function main(): Promise<void> {
   await registerCommands(env, COMMANDS);
 
   const client = createDiscordClient();
-  const ctx = { env, db, github: createGitHub(env), commands: COMMANDS };
+  const ctx = { env, db, github: createGitHub(env), gemini: createGemini(env), commands: COMMANDS };
 
   client.once(Events.ClientReady, (ready) => {
     log.info('discord ready', { user: ready.user.tag, guild: env.DISCORD_GUILD_ID });

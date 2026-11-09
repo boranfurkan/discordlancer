@@ -164,10 +164,12 @@ if (discordOk) {
         'Create Instant Invite': 0n, 'Manage Channels': 4n, 'Manage Server': 5n, 'View Channels': 10n,
         'Send Messages': 11n, 'Manage Messages': 13n, 'Embed Links': 14n, 'Attach Files': 15n,
         'Read Message History': 16n, 'Manage Roles': 28n, 'Send Messages in Threads': 38n,
+        // Discord split pinning out of Manage Messages; the bot pins each spec.
+        'Pin Messages': 51n,
       };
       const missing = Object.entries(needed).filter(([, bit]) => !(perms & (1n << bit))).map(([label]) => label);
       if (missing.length) fail(`missing: ${missing.join(', ')}`);
-      return 'all 11 needed permissions';
+      return `all ${Object.keys(needed).length} needed permissions`;
     });
   }
 }

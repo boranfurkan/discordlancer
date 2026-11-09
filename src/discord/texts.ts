@@ -45,3 +45,19 @@ export function welcomeText(clientId: string): string {
     'Type /help at any time to see what you can do.',
   ].join('\n');
 }
+
+/** The default quote terms. Boran should review these; they are a business decision. */
+export function quoteTerms(specVersion: number, amount: string, deadline: string): string[] {
+  return [
+    `Scope: what spec v${specVersion} describes. Anything beyond it needs a new quote.`,
+    `Price: ${amount} USDC, paid in full on Solana before work starts.`,
+    `Delivery: by ${deadline}, in a GitHub repo you have access to.`,
+    'Ownership: the code is yours once the payment is confirmed.',
+    "Fixes: anything that doesn't match the agreed spec is fixed at no extra cost. New features need a new quote.",
+  ];
+}
+
+/** Discord messages are limited to 2,000 characters. */
+export function fitMessage(text: string, limit = 1_950): string {
+  return text.length <= limit ? text : `${text.slice(0, limit - 20).trimEnd()}\n…(shortened)`;
+}

@@ -5,8 +5,22 @@ import { help } from './help.js';
 import { linkClient } from './linkClient.js';
 import { newProject } from './newProject.js';
 import { projectInfo } from './project.js';
+import { acceptQuote, quote } from './quote.js';
+import { agreeSpecs, createSpecs } from './specs.js';
 
-export const COMMANDS: readonly Command[] = [help, projectInfo, newProject, linkClient, addGithub, cancel, archive];
+export const COMMANDS: readonly Command[] = [
+  help,
+  projectInfo,
+  newProject,
+  linkClient,
+  addGithub,
+  createSpecs,
+  agreeSpecs,
+  quote,
+  acceptQuote,
+  cancel,
+  archive,
+];
 
 const names = COMMANDS.map((command) => command.name);
 const duplicate = names.find((name, index) => names.indexOf(name) !== index);

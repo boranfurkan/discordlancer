@@ -4,12 +4,14 @@ import type { Actor } from '../db/events.js';
 import type { Project } from '../db/projects.js';
 import type { Stage } from '../domain/stages.js';
 import type { Env } from '../env.js';
+import type { GeminiApi } from '../services/gemini.js';
 import type { GitHubApi } from '../services/github.js';
 
 export interface BotContext {
   env: Env;
   db: Surreal;
   github: GitHubApi;
+  gemini: GeminiApi;
   commands: readonly Command[];
 }
 

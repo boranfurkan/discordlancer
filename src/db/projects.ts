@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { assertMove, STAGES, type Stage } from '../domain/stages.js';
 import type { EventInput } from './events.js';
 
-const toDate = z.custom<DateTime | Date>((value) => value instanceof DateTime || value instanceof Date).transform(
+export const toDate = z.custom<DateTime | Date>((value) => value instanceof DateTime || value instanceof Date).transform(
   (value) => (value instanceof DateTime ? value.toDate() : value),
 );
 
@@ -50,7 +50,7 @@ export async function listProjectsInStage(db: Surreal, stage: Stage): Promise<Pr
   return parseRows(rows);
 }
 
-function eventContent(event: EventInput, project: RecordId<'project'>): Record<string, unknown> {
+export function eventContent(event: EventInput, project: RecordId<'project'>): Record<string, unknown> {
   const content: Record<string, unknown> = {
     actor: event.actor,
     action: event.action,
