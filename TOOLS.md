@@ -89,3 +89,4 @@ See `.env.example` for the variable names and `~/Desktop/env-setup.md` for where
 
 - **SurrealDB is version 4 (Earth).** HTTP `/signin` refuses system users there, so connect over the WebSocket RPC, which the SDK does.
 - **Gemini runs on prepaid AI Studio credits.** If a call returns HTTP 402, top up in AI Studio.
+- **GitHub needs a classic token with only the `repo` scope.** A fine-grained token was refused when adding collaborators to personal repos (403, "Resource not accessible by personal access token"), even with Administration: Read and write. The classic token has full control of all your repos, so it lives only in `.env` and Replit Secrets. Use a 90-day expiry.

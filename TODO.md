@@ -7,9 +7,9 @@ Freeze: **Wed 18 Nov, 6pm.** The client comes first, so bot work fits around the
 **Morning of Mon 9 Nov, in this order.** The bot was built overnight (phases 1, 2 and 4 to 7). It is running on the Mac until it is deployed.
 
 1. [ ] **Ask your referrer for an intro.** Keep the message for the audit, and log the ask as a touch.
-2. [ ] **GitHub token:** set Repository permissions → Administration to **Read and write** (Settings → Developer settings → Fine-grained tokens → your token → Edit). The token value doesn't change. Needed by `/add-github`.
-3. [ ] **Discord:** give the bot's role **Pin Messages** (Server Settings → Roles). Needed to pin specs.
-4. [ ] Run `npm run check:env`: it should show 23 passed.
+2. [x] **GitHub token:** replaced with a classic token (`repo` scope only). The fine-grained token kept failing to add collaborators even with Administration: Read and write. Delete the old fine-grained token if you haven't.
+3. [x] **Discord:** the bot's role has **Pin Messages**.
+4. [x] `npm run check:env`: 23 passed on 9 Nov, morning.
 5. [ ] **Second-account test on `dl-test-alpha`,** playing the client with another Discord account:
    - join with `dl-test-alpha`'s invite (`/new-project dl-test-alpha` again gives a fresh one): only that channel opens, with the welcome;
    - as the client: `/help`, `/project`, `/add-github <your second GitHub account, or skip>`;
