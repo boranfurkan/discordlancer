@@ -240,7 +240,7 @@ Clients ask with `/ask`. Boran gets an answer to a client's message by replying 
 5. Tessl opens a pull request on a `tessl/` branch, usually within about 90 seconds of the label.
 6. The bot posts the pull request in the channel, with a review reminder in `owner-desk`. Boran reviews and merges it, and the bot posts that it's merged (or closed). The pull request is found by Tessl's branch name, `tessl/issue-<n>`, or its title, `#<n>: …`, checked every minute.
 
-**Setup per client repo:** turn the factory on in the Tessl web app at delivery. It can't be scripted. Once, install the Tessl GitHub App on `boranfurkan` with All repositories.
+**Setup per client repo:** not automatic. At delivery, Claude Code turns the factory on with the `tessl__factory-setup` skill (create the Tessl project, check the app reaches the repo, turn on Ticket to PR), as was done for `dl-test-tessl`; no web app step is needed. Until then, an approved change request opens an issue that nothing picks up. The Tessl GitHub App is already installed on `boranfurkan` with All repositories.
 
 **Safety:**
 - Give Tessl's environment pull-request access only, and keep no secrets in it.
