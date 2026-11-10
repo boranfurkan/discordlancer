@@ -249,7 +249,8 @@ Skills: the `tessl__*` skills, `gemini-api-dev`, `surrealdb-agent-memory-docs`.
 - [x] `/invite` for each extra person on the client's team; joins matched through the `invite` table; channel, voice, threads and the Client role for each. Anyone on the team acts for the client (Boran's choice). See `PLAN.md`, People and permissions.
 - [x] 📞 Calls, 🔧 Code changes and 📈 Progress updates threads in each project channel. See `PLAN.md`, Threads.
 - [x] Journey test: the client's CTO joins with a team invite, agrees for the team, and is in the Code changes thread.
-- [ ] **Live after deploying:** a progress update through Claude Code makes the 📈 Progress updates thread (Claude can do this alone); a team invite with a real second person when one is available.
+- [x] **Live on Replit (10 Nov):** two progress updates through Claude Code made one 📈 Progress updates thread (public, archives after a week), with Boran added; the main channel got only Discord's "started a thread" line. Reset afterwards.
+- [ ] A team invite with a real second person, when one is available.
 
 ### Phase 10: Calls and project docs (added 10 Nov)
 
@@ -259,7 +260,7 @@ Skills: the `tessl__*` skills, `gemini-api-dev`, `surrealdb-agent-memory-docs`.
 - [x] Real checks: spoken audio through the real transcription and summary; the real docs passes; a real commit and pull request with the bot's token.
 - [x] Transcription by ElevenLabs Scribe (one request per speaker, word timings back to turns, its copy deleted after), Gemini as the fallback. Unit-tested with a fake ElevenLabs.
 - [ ] **Boran:** claim the ElevenLabs credit (tag the organisers in the team channel, by 21 Nov), make an API key with only the Speech to Text permission, and add `ELEVENLABS_API_KEY` to `.env` and Replit Secrets. Then Claude runs the spoken test clips through the real ElevenLabs.
-- [ ] **Live after deploying:** a real call in a test project's voice channel (Boran talks for a minute), `/call stop`, the notes; then `/sync-docs` there.
+- [x] **Live on Replit (10 Nov):** a real call in a test voice channel, transcribed by ElevenLabs; `/sync-docs` updated the pull request with 0 unmatched citations (about 6 minutes). Reset afterwards.
 - [ ] **Boran:** delete the test repo `boranfurkan/dl-test-docs` afterwards.
 
 ### Phase 9: Progress updates from Claude Code (added 10 Nov)
