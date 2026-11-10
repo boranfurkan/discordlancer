@@ -23,7 +23,8 @@ import { latestSpec } from '../db/deals.js';
 import { recordEvent } from '../db/events.js';
 import type { Project } from '../db/projects.js';
 import { log } from '../log.js';
-import type { CallSummary } from '../prompts/calls.js';
+import { CALL_SUMMARY_PROMPT_VERSION, type CallSummary } from '../prompts/calls.js';
+import { STT_MODEL } from '../services/elevenlabs.js';
 import { GeminiError, SPEC_MODEL } from '../services/gemini.js';
 import { projectScope, safeRemember } from '../services/memory.js';
 import { ensureOwnerChannel, ensureProjectVoice } from '../discord/channels.js';
@@ -32,7 +33,7 @@ import { UserError, type BotContext } from '../discord/command.js';
 import { OWNER_NAME } from '../discord/guards.js';
 import { fitMessage } from '../discord/texts.js';
 import { CallRecorder, type ReceiverLike } from './recorder.js';
-import { assembleTranscript, CALL_PROMPT_VERSION, prepareSegments, summariseCall, transcribeSegments, type Segment, type Speaker } from './transcribe.js';
+import { assembleTranscript, CALL_PROMPT_VERSION, prepareSegments, summariseCall, transcribeSegments, transcribeWithElevenLabs, type Segment, type Speaker } from './transcribe.js';
 
 export const CONSENT_PREFIX = 'call-consent:';
 export const MAX_CALL_MINUTES = 120;
@@ -135,7 +136,12 @@ export function consentText(projectName: string, voiceId: string, people: readon
 const minutes = (from: Date, to: Date) => Math.max(1, Math.round((to.getTime() - from.getTime()) / 60_000));
 
 /** Pure: the notes posted after a call. Always marked as AI-written. */
-export function callNotesText(summary: CallSummary, meta: { startedAt: Date; endedAt: Date; clientName: string }): string {
+export type Transcriber = 'ElevenLabs' | 'Gemini';
+
+/** Which service transcribed a saved call, from its model field. */
+export const transcriberOf = (model: string): Transcriber => (model.startsWith('elevenlabs/') ? 'ElevenLabs' : 'Gemini');
+
+export function callNotesText(summary: CallSummary, meta: { startedAt: Date; endedAt: Date; clientName: string; transcriber?: Transcriber }): string {
   const whoDoes = { owner: OWNER_NAME, client: meta.clientName, both: 'Both' } as const;
   const list = (items: readonly string[]) => items.map((item) => `- ${item}`).join('\n');
   const day = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', dateStyle: 'medium', timeStyle: 'short' }).format(meta.startedAt);
@@ -145,20 +151,20 @@ export function callNotesText(summary: CallSummary, meta: { startedAt: Date; end
     summary.decisions.length ? `**Decisions**\n${list(summary.decisions)}` : '',
     summary.action_items.length ? `**Action items**\n${list(summary.action_items.map((item) => `${whoDoes[item.who]}: ${item.what}`))}` : '',
     summary.open_questions.length ? `**Open questions**\n${list(summary.open_questions)}` : '',
-    "-# AI-written from the call recording (Gemini). The full transcript is attached. If anything here is wrong, say so in this channel and it'll be corrected.",
+    `-# AI-written from the call recording (transcribed by ${meta.transcriber ?? 'Gemini'}, summarised by Gemini). The full transcript is attached. If anything here is wrong, say so in this channel and it'll be corrected.`,
   ];
   return fitMessage(parts.filter(Boolean).join('\n\n'));
 }
 
 /** Pure: the transcript file attached to the notes. */
-export function transcriptFile(projectName: string, call: Pick<Call, 'started_at' | 'ended_at' | 'transcript' | 'participants'>): string {
+export function transcriptFile(projectName: string, call: Pick<Call, 'started_at' | 'ended_at' | 'transcript' | 'participants' | 'model'>): string {
   const recorded = call.participants.filter((person) => person.recorded).map((person) => person.name);
   const notRecorded = call.participants.filter((person) => !person.recorded).map((person) => person.name);
   return [
     `# Call transcript: ${projectName}, ${callLabel(call)} UTC`,
     '',
     `Length: ${minutes(call.started_at, call.ended_at)} min. Recorded: ${recorded.join(', ') || 'nobody'}.${notRecorded.length ? ` Not recorded: ${notRecorded.join(', ')}.` : ''}`,
-    'Transcribed by AI (Gemini) from the recording; times are from the start of the call. The audio was deleted after transcription.',
+    `Transcribed by AI (${transcriberOf(call.model)}) from the recording; times are from the start of the call. The audio was deleted after transcription.`,
     '',
     call.transcript,
     '',
@@ -246,7 +252,19 @@ export function createCallManager(ctx: BotContext, options: CallOptions = {}): C
         return;
       }
       const speakers = new Map([...recording.people].map(([userId, person]) => [userId, { name: person.name, role: person.role }]));
-      const texts = await transcribeSegments(ctx.gemini, prepared, speakers);
+      let transcriber: Transcriber = 'Gemini';
+      let texts: Map<number, string> | undefined;
+      if (ctx.stt) {
+        try {
+          texts = await transcribeWithElevenLabs(ctx.stt, prepared);
+          transcriber = 'ElevenLabs';
+        } catch (error) {
+          log.warn('ElevenLabs could not transcribe a call; using Gemini instead', { project: project.name, error });
+          const desk = await ensureOwnerChannel(text.guild, ownerId).catch(() => undefined);
+          await desk?.send(`**${project.name}**: ElevenLabs couldn't transcribe the call (${error instanceof Error ? error.message : 'unknown error'}), so Gemini transcribed it instead.`).catch(() => undefined);
+        }
+      }
+      texts ??= await transcribeSegments(ctx.gemini, prepared, speakers);
       const transcript = assembleTranscript(prepared, texts, speakers);
       if (!transcript) {
         await text.send({ content: "The call ended, but no speech could be made out in the recording, so there are no notes.", allowedMentions: { parse: [] } });
@@ -262,15 +280,17 @@ export function createCallManager(ctx: BotContext, options: CallOptions = {}): C
         recorded: recording.consent.get(person.userId) === 'yes',
       }));
       const speechSeconds = prepared.reduce((sum, segment) => sum + segment.seconds, 0);
+      const model = transcriber === 'ElevenLabs' ? `elevenlabs/${STT_MODEL} + ${SPEC_MODEL}` : SPEC_MODEL;
+      const promptVersion = transcriber === 'ElevenLabs' ? CALL_SUMMARY_PROMPT_VERSION : CALL_PROMPT_VERSION;
       const call = await saveCall(
         ctx.db,
         project,
-        { startedAt: recording.startedAt, endedAt: recording.endedAt, participants, transcript, summary, speechSeconds, segments: prepared.length, model: SPEC_MODEL, promptVersion: CALL_PROMPT_VERSION },
-        { actor: 'owner', actorId: ownerId, action: 'call.recorded', outcome: 'ok', data: { minutes: minutes(recording.startedAt, recording.endedAt), segments: prepared.length, model: SPEC_MODEL, prompt_version: CALL_PROMPT_VERSION } },
+        { startedAt: recording.startedAt, endedAt: recording.endedAt, participants, transcript, summary, speechSeconds, segments: prepared.length, model, promptVersion },
+        { actor: 'owner', actorId: ownerId, action: 'call.recorded', outcome: 'ok', data: { minutes: minutes(recording.startedAt, recording.endedAt), segments: prepared.length, transcriber, model, prompt_version: promptVersion } },
       );
       const clientName = participants.find((person) => person.role === 'client')?.name ?? 'Client';
       await text.send({
-        content: callNotesText(summary, { startedAt: call.started_at, endedAt: call.ended_at, clientName }),
+        content: callNotesText(summary, { startedAt: call.started_at, endedAt: call.ended_at, clientName, transcriber }),
         files: [new AttachmentBuilder(Buffer.from(transcriptFile(project.name, call)), { name: `call-${callLabel(call).replace(/[ :]/g, '-')}-transcript.md` })],
         allowedMentions: { parse: [] },
       });

@@ -2,6 +2,7 @@
 // own Ogg file, so who said what is known from Discord, not guessed by the model.
 
 import { CALL_SUMMARY_PROMPT_VERSION, CALL_SUMMARY_SCHEMA, CALL_SUMMARY_SYSTEM, CallSummary, TRANSCRIBE_PROMPT_VERSION, TRANSCRIBE_SCHEMA, TRANSCRIBE_SYSTEM, TranscribeOutput } from '../prompts/calls.js';
+import type { SpeechToTextApi, SttWord } from '../services/elevenlabs.js';
 import { SPEC_MODEL, type GeminiApi, type Part } from '../services/gemini.js';
 import { oggOpusFile, opusPacketSamples } from './ogg.js';
 
@@ -27,6 +28,7 @@ export interface PreparedSegment {
   userId: string;
   offsetSeconds: number;
   seconds: number;
+  packets: Buffer[];
   ogg: Buffer;
 }
 
@@ -40,6 +42,7 @@ export function prepareSegments(segments: readonly Segment[], callStart: Date): 
       userId: segment.userId,
       offsetSeconds: Math.max(0, (segment.startedAt.getTime() - callStart.getTime()) / 1000),
       seconds: segmentSeconds(segment),
+      packets: segment.packets,
       ogg: oggOpusFile(segment.packets),
     }));
 }
@@ -129,3 +132,67 @@ export async function summariseCall(gemini: GeminiApi, transcript: string, spec?
 }
 
 export const CALL_PROMPT_VERSION = `${TRANSCRIBE_PROMPT_VERSION}+${CALL_SUMMARY_PROMPT_VERSION}`;
+
+// ---- ElevenLabs: one file per speaker --------------------------------------
+
+/** Discord's own Opus silence frame: 20 ms of nothing. */
+const SILENCE_FRAME = Buffer.from([0xf8, 0xff, 0xfe]);
+/** Silence put between a speaker's turns, so words fall clearly into one turn or the next. */
+export const TURN_GAP_SECONDS = 1;
+
+export interface SpeakerTrack {
+  packets: Buffer[];
+  /** Where each turn sits in the track, in seconds. */
+  ranges: Array<{ n: number; start: number; end: number }>;
+}
+
+/** Pure: one speaker's turns, back to back with a second of silence between them. */
+export function buildSpeakerTrack(segments: ReadonlyArray<Pick<PreparedSegment, 'n' | 'packets' | 'seconds'>>): SpeakerTrack {
+  const packets: Buffer[] = [];
+  const ranges: SpeakerTrack['ranges'] = [];
+  let at = 0;
+  segments.forEach((segment, index) => {
+    if (index > 0) {
+      for (let i = 0; i < TURN_GAP_SECONDS * 50; i++) packets.push(SILENCE_FRAME);
+      at += TURN_GAP_SECONDS;
+    }
+    ranges.push({ n: segment.n, start: at, end: at + segment.seconds });
+    packets.push(...segment.packets);
+    at += segment.seconds;
+  });
+  return { packets, ranges };
+}
+
+/** Pure: puts each transcribed word back into the turn it was said in, by its time. */
+export function assignWords(words: readonly SttWord[], ranges: SpeakerTrack['ranges']): Map<number, string> {
+  const texts = new Map<number, string>(ranges.map((range) => [range.n, '']));
+  const half = TURN_GAP_SECONDS / 2;
+  let current = ranges[0]?.n;
+  for (const word of words) {
+    if (word.type === 'audio_event') continue;
+    if (typeof word.start === 'number') {
+      const range = ranges.find((candidate) => word.start! >= candidate.start - half && word.start! < candidate.end + half) ?? ranges.findLast((candidate) => word.start! >= candidate.start);
+      if (range) current = range.n;
+    }
+    if (current === undefined) continue;
+    texts.set(current, `${texts.get(current)}${word.type === 'spacing' ? ' ' : word.text}`);
+  }
+  for (const [n, text] of texts) texts.set(n, text.replace(/\s+/g, ' ').trim());
+  return texts;
+}
+
+/** Transcribes with ElevenLabs: one request per speaker, words mapped back to turns. */
+export async function transcribeWithElevenLabs(stt: SpeechToTextApi, segments: readonly PreparedSegment[]): Promise<Map<number, string>> {
+  const bySpeaker = new Map<string, PreparedSegment[]>();
+  for (const segment of segments) bySpeaker.set(segment.userId, [...(bySpeaker.get(segment.userId) ?? []), segment]);
+  const texts = new Map<number, string>();
+  const results = await Promise.all(
+    [...bySpeaker.values()].map(async (turns) => {
+      const track = buildSpeakerTrack(turns);
+      const result = await stt.transcribe(oggOpusFile(track.packets), 'speaker.ogg', 'audio/ogg');
+      return assignWords(result.words, track.ranges);
+    }),
+  );
+  for (const result of results) for (const [n, text] of result) texts.set(n, text);
+  return texts;
+}

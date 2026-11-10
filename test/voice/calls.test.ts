@@ -10,7 +10,9 @@ import { CALL_SUMMARY_SYSTEM, TRANSCRIBE_SYSTEM } from '../../src/prompts/calls.
 import { GeminiError, type GeminiApi, type JsonRequest } from '../../src/services/gemini.js';
 import type { MemoryApi } from '../../src/services/memory.js';
 import { callNotesText, consentText, createCallManager, type CallManager, type VoiceLink } from '../../src/voice/calls.js';
-import { assembleTranscript, clock, planBatches } from '../../src/voice/transcribe.js';
+import { assembleTranscript, assignWords, buildSpeakerTrack, clock, planBatches } from '../../src/voice/transcribe.js';
+import type { SpeechToTextApi } from '../../src/services/elevenlabs.js';
+import { oggOpusFile } from '../../src/voice/ogg.js';
 import { memoryDb } from '../helpers/db.js';
 import { buttonInteraction, FakeGuild, type FakeChannel } from '../helpers/fakeDiscord.js';
 
@@ -91,12 +93,13 @@ const voiceChannel = (members: Array<{ id: string; bot: boolean }>) => ({
   members: new Collection(members.map((member) => [member.id, { id: member.id, user: { bot: member.bot } }])),
 });
 
-function manager(fake: FakeVoice, members = [{ id: OWNER.id, bot: false }], extra: { emptyGraceMs?: number } = {}): CallManager {
+function manager(fake: FakeVoice, members = [{ id: OWNER.id, bot: false }], extra: { emptyGraceMs?: number; stt?: SpeechToTextApi } = {}): CallManager {
   const ctx = {
     env: { DISCORD_OWNER_ID: OWNER.id, DISCORD_GUILD_ID: guild.id },
     db,
     gemini,
     memory,
+    ...(extra.stt ? { stt: extra.stt } : {}),
   } as unknown as BotContext;
   return createCallManager(ctx, {
     join: async () => fake.link,
@@ -223,7 +226,94 @@ describe('a recorded call', () => {
   });
 });
 
+describe('a call transcribed by ElevenLabs', () => {
+  /** A fake ElevenLabs: says which file it got, and answers with timed words for one turn. */
+  function fakeStt(fail = false) {
+    const files: Buffer[] = [];
+    const stt: SpeechToTextApi = {
+      async transcribe(audio) {
+        files.push(audio);
+        if (fail) throw new Error('ElevenLabs credits have run out');
+        const n = files.length;
+        return { text: '', languageCode: 'en', words: [
+          { text: `Speaker${n}`, type: 'word', start: 0.1, end: 0.5 },
+          { text: ' ', type: 'spacing', start: 0.5, end: 0.6 },
+          { text: '(laughs)', type: 'audio_event', start: 0.6, end: 0.9 },
+          { text: 'here.', type: 'word', start: 0.9, end: 1.2 },
+        ] };
+      },
+    };
+    return { stt, files };
+  }
+
+  it('sends one file per speaker, and marks the notes and record as ElevenLabs', async () => {
+    const fake = new FakeVoice();
+    const { stt, files } = fakeStt();
+    const calls = manager(fake, [{ id: OWNER.id, bot: false }], { stt });
+    await calls.start(project, text as never);
+    await calls.onConsent(buttonInteraction(guild, text, CLIENT, consentId('yes')) as never);
+    await tick();
+    fake.talk(OWNER.id, 1);
+    fake.talk(CLIENT.id, 1);
+    fake.talk(OWNER.id, 1);
+    await calls.stop('alpha', 'test');
+    await calls.idle();
+    expect(files).toHaveLength(2);
+    expect(files.every((file) => file.subarray(0, 4).toString() === 'OggS')).toBe(true);
+    expect(geminiCalls).toEqual(['summary']); // no Gemini transcription
+    expect(text.history.at(-1)!.content).toContain('transcribed by ElevenLabs, summarised by Gemini');
+    const saved = (await callsFor(db, project)).at(-1)!;
+    expect(saved.model).toMatch(/^elevenlabs\/scribe_v2 \+ /);
+    expect(saved.transcript).toContain('Speaker1 here.');
+    expect(saved.transcript).not.toContain('(laughs)');
+  });
+
+  it('falls back to Gemini when ElevenLabs fails, and tells Furkan', async () => {
+    const fake = new FakeVoice();
+    const { stt } = fakeStt(true);
+    const calls = manager(fake, [{ id: OWNER.id, bot: false }], { stt });
+    await calls.start(project, text as never);
+    fake.talk(OWNER.id, 1);
+    await calls.stop('alpha', 'test');
+    await calls.idle();
+    expect(geminiCalls).toEqual(['transcribe', 'summary']);
+    expect(guild.channelNamed('owner-desk').botText().at(-1)).toContain("ElevenLabs couldn't transcribe the call");
+    expect(text.history.at(-1)!.content).toContain('transcribed by Gemini');
+  });
+});
+
 describe('call wording and transcripts', () => {
+  it("joins a speaker's turns with a second of silence, and puts each word back in its turn", () => {
+    const frame = Buffer.from([0xfc, 1, 2]); // 20 ms
+    const track = buildSpeakerTrack([
+      { n: 1, packets: Array(100).fill(frame), seconds: 2 },
+      { n: 4, packets: Array(50).fill(frame), seconds: 1 },
+    ]);
+    expect(track.ranges).toEqual([
+      { n: 1, start: 0, end: 2 },
+      { n: 4, start: 3, end: 4 },
+    ]);
+    expect(track.packets).toHaveLength(100 + 50 + 50);
+    expect(oggOpusFile(track.packets).length).toBeGreaterThan(0);
+    const texts = assignWords(
+      [
+        { text: 'Hello', type: 'word', start: 0.2 },
+        { text: ' ', type: 'spacing', start: 0.6 },
+        { text: 'there.', type: 'word', start: 1.9 },
+        { text: ' ', type: 'spacing', start: 2.4 },
+        { text: '(cough)', type: 'audio_event', start: 2.6 },
+        { text: 'Second', type: 'word', start: 3.1 },
+        { text: ' ', type: 'spacing' },
+        { text: 'turn.', type: 'word', start: 3.6 },
+      ],
+      track.ranges,
+    );
+    expect(texts).toEqual(new Map([
+      [1, 'Hello there.'],
+      [4, 'Second turn.'],
+    ]));
+  });
+
   it('formats clock times and merges a speaker\'s close turns', () => {
     expect(clock(3725.9)).toBe('01:02:05');
     const speakers = new Map([

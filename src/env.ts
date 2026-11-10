@@ -7,6 +7,8 @@ import { z } from 'zod';
 const required = z.string().trim().min(1, 'is empty');
 const discordId = z.string().trim().regex(/^\d{17,20}$/, 'must be a Discord ID of 17 to 20 digits');
 const prefixed = (pattern: RegExp, hint: string) => z.string().trim().regex(pattern, hint);
+/** Optional: left empty, the feature falls back or stays off. */
+const optional = z.preprocess((value) => (typeof value === 'string' && value.trim() === '' ? undefined : value), z.string().trim().optional());
 
 export const EnvSchema = z.object({
   DISCORD_TOKEN: required,
@@ -27,6 +29,8 @@ export const EnvSchema = z.object({
   SOLANA_WALLET_ADDRESS: prefixed(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, 'must be a Solana address'),
   SOLANA_RPC_URL: prefixed(/^https:\/\//, 'must start with https://'),
   TAVILY_API_KEY: required,
+  /** ElevenLabs speech to text, for recorded calls. Without it, Gemini transcribes them. */
+  ELEVENLABS_API_KEY: optional,
 });
 
 export type Env = z.infer<typeof EnvSchema>;
@@ -41,6 +45,7 @@ export const SECRET_NAMES = [
   'MEMORY_API_KEY',
   'SOLANA_RPC_URL',
   'TAVILY_API_KEY',
+  'ELEVENLABS_API_KEY',
 ] as const satisfies readonly (keyof Env)[];
 
 export class EnvError extends Error {
@@ -65,7 +70,7 @@ export function loadEnv(file = '.env'): Env {
 
 /** Every secret value, including the API key inside the Solana RPC URL. */
 export function secretValues(env: Env): string[] {
-  const values: string[] = SECRET_NAMES.map((name) => env[name]);
+  const values: string[] = SECRET_NAMES.map((name) => env[name]).filter((value): value is string => Boolean(value));
   try {
     for (const value of new URL(env.SOLANA_RPC_URL).searchParams.values()) values.push(value);
   } catch {

@@ -4,6 +4,7 @@ import type { Actor } from '../db/events.js';
 import type { Project } from '../db/projects.js';
 import type { Stage } from '../domain/stages.js';
 import type { Env } from '../env.js';
+import type { SpeechToTextApi } from '../services/elevenlabs.js';
 import type { GeminiApi } from '../services/gemini.js';
 import type { GitHubApi } from '../services/github.js';
 import type { MemoryApi } from '../services/memory.js';
@@ -20,6 +21,8 @@ export interface BotContext {
   commands: readonly Command[];
   /** Recorded calls; absent in tests that don't use them. */
   calls?: CallManager;
+  /** ElevenLabs speech to text, when its key is set; otherwise Gemini transcribes calls. */
+  stt?: SpeechToTextApi;
 }
 
 /** Who may run a command. Every command is visible to everyone. */

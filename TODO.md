@@ -250,6 +250,8 @@ Skills: the `tessl__*` skills, `gemini-api-dev`, `surrealdb-agent-memory-docs`.
 - [x] Calls feed `/ask`, `/create-specs` and the evidence pack.
 - [x] `/sync-docs`: writer and reviewer passes, citation check, one pull request on `discordlancer/project-docs`. See `PLAN.md`, Project docs in the repo.
 - [x] Real checks: spoken audio through the real transcription and summary; the real docs passes; a real commit and pull request with the bot's token.
+- [x] Transcription by ElevenLabs Scribe (one request per speaker, word timings back to turns, its copy deleted after), Gemini as the fallback. Unit-tested with a fake ElevenLabs.
+- [ ] **Boran:** claim the ElevenLabs credit (tag the organisers in the team channel, by 21 Nov), make an API key with only the Speech to Text permission, and add `ELEVENLABS_API_KEY` to `.env` and Replit Secrets. Then Claude runs the spoken test clips through the real ElevenLabs.
 - [ ] **Live after deploying:** a real call in a test project's voice channel (Boran talks for a minute), `/call stop`, the notes; then `/sync-docs` there.
 - [ ] **Boran:** delete the test repo `boranfurkan/dl-test-docs` afterwards.
 

@@ -12,6 +12,7 @@ import { onOwnerMention } from './discord/ownerAnswer.js';
 import { CONSENT_PREFIX, onCallConsent } from './discord/commands/call.js';
 import type { BotContext } from './discord/command.js';
 import { createCallManager } from './voice/calls.js';
+import { createElevenLabs } from './services/elevenlabs.js';
 import { createGemini } from './services/gemini.js';
 import { createGitHub } from './services/github.js';
 import { createMemory } from './services/memory.js';
@@ -56,7 +57,9 @@ async function main(): Promise<void> {
     solana: createSolana(env),
     memory: createMemory(env),
     commands: COMMANDS,
+    ...(env.ELEVENLABS_API_KEY ? { stt: createElevenLabs(env) } : {}),
   };
+  log.info('call transcription', { service: ctx.stt ? 'ElevenLabs' : 'Gemini' });
   ctx.calls = createCallManager(ctx);
 
   // Claude Code's progress updates: posted in the project's channel, pinging nobody.

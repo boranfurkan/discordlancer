@@ -42,7 +42,7 @@ export function welcomeText(clientId: string): string {
     '',
     `**Questions** about the project, at any stage: /ask. The AI assistant answers here from this chat, the specs and the code, and ${OWNER_NAME} follows up on anything it can't answer or that needs his decision.`,
     '',
-    `**Privacy:** the bot keeps a record of this project: the messages here (used to write the specs and answer questions), the commands you run, and payments. That gives you both a clear history. Specs, progress estimates and assistant answers are drafted with AI (Google Gemini) and marked as such; Gemini does not keep them. Progress updates are written by ${OWNER_NAME}'s AI coding assistant (Claude) while he works, and are marked as such too. Calls in the project's voice channel are recorded only if you agree each time (a button); the bot keeps the transcript and a summary, not the audio.`,
+    `**Privacy:** the bot keeps a record of this project: the messages here (used to write the specs and answer questions), the commands you run, and payments. That gives you both a clear history. Specs, progress estimates and assistant answers are drafted with AI (Google Gemini) and marked as such; Gemini does not keep them. Progress updates are written by ${OWNER_NAME}'s AI coding assistant (Claude) while he works, and are marked as such too. Calls in the project's voice channel are recorded only if you agree each time (a button): ElevenLabs transcribes them and the bot then asks it to delete its copy; the bot keeps the transcript and a summary, not the audio.`,
     '',
     'Type /help at any time to see what you can do.',
   ].join('\n');

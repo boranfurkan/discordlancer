@@ -11,7 +11,7 @@ The bot runs as one always-on process. Replit's **Reserved VM** keeps it on. Aut
 
 1. **Import the repo.** In Replit, create an app from GitHub and pick `boranfurkan/discordlancer`. Replit creates its own `.replit` file. Commit it only if it looks right.
 2. **Check the Node version.** In the Replit Shell, run `node -v`. It must print `v24.x`. If not, set the Node.js version to 24 in the app's language or system settings (**check** where Replit puts this), then run `node -v` again.
-3. **Add the Secrets.** Add each of the 18 variables in `.env.example` under Secrets, with the same values as your local `.env`.
+3. **Add the Secrets.** Add each of the 18 required variables in `.env.example` under Secrets, with the same values as your local `.env`. `ELEVENLABS_API_KEY` is optional: with it, ElevenLabs transcribes recorded calls; without it, Gemini does.
 4. **Install and check.** In the Shell:
    ```bash
    npm ci
