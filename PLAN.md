@@ -113,6 +113,7 @@ SurrealDB 4 on SurrealDB Cloud (Earth): namespace `freelance`, database `bot`. E
 | `payment_request` | Project, quote version, amount, reference key, status (`open`, `paid`, `expired`) | Reference |
 | `payment` | Project, request, signature, from wallet, to wallet, amount, slot, block time, verified time | Signature |
 | `change_request` | Project, text, Gemini's triage, status, issue number, PR number | |
+| `issued_invoice` | **Append-only:** invoice number (`DL-2026-0001`, one sequence), project, billed to, amount, quote and spec versions, payment signatures, note, the invoice it replaces | Number; sequence |
 | `invite` | Team invites from `/invite`: code, project, status (`open`, `used`), who used it | Code |
 | `call` | **Append-only:** project, start and end, participants (name, role, whether they agreed to be recorded), AI transcript, AI summary (decisions, action items, open questions), speech seconds, turns, model, prompt versions. Never the audio | |
 
@@ -154,6 +155,7 @@ Commands are registered on our server only, so changes appear instantly. Every c
 | `/help` | Both | 1 | The commands the caller can run at this stage |
 | `/new-project name` | Boran | 2 | Creates the private channel, a single-use invite and a private repo with the same name. Replies privately with the invite link |
 | `/link-client user` | Boran | 2 | Fallback: attaches a member to the project (as its client, or one more of the client's team) if invite tracking missed them |
+| `/invoice billed_to [note] [correct]` | Boran | 12 | A PDF invoice for a paid project, sent to #owner-desk for the organisers (they confirm payments with it) and the client |
 | `/invite` | Boran | 11 | An invite for one more person on the client's team (single-use, 7 days) |
 | `/call start \| stop \| retry` | Boran | 10 | Records a call in the project's voice channel, with each person's consent; notes in the 📞 Calls thread |
 | `/sync-docs` | Boran | 10 | Writes the project docs into the repo as a pull request |
@@ -257,6 +259,18 @@ While Boran builds a client's app with Claude Code, the session can tell the cli
   - `post_update`: summary, done, next, and optionally what's needed from the client. Posted in the key's own project channel, pinging nobody, ending "Written by Furkan's AI coding assistant (Claude) during his work session". Refused before the client joins, after cancel or archive, over 6 a day, over 1,900 characters, or when it looks like it contains a key. Recorded as `dev.update_posted` (actor `owner`) and remembered in Agent Memory, so `/ask` can answer "how's it going?".
 - **Boran sees every update before it goes out:** Claude Code asks permission for `post_update` and shows the text. Keep it that way rather than allowing it always.
 - **Touches:** the build session is one touch. Updates posted during it don't add more; `/touches` describes them as part of the build session.
+
+## Invoices
+
+The organisers confirm each payment from an invoice before it goes on the leaderboard (Shipyard Admin, 9 Nov). `/invoice billed_to [note] [correct]` makes one for a paid project, as a PDF in `#owner-desk`:
+- number and issue date; the seller (`SELLER` in `src/domain/invoice.ts`) and the receiving wallet; who it is billed to (Boran types it; `|` separates lines);
+- the line item: the project, as agreed in spec vN and quote vN (and when the quote was accepted), with the delivery date; the amount in USDC;
+- total, paid and balance due, marked PAID; each payment's time, amount, wallets and transaction, with a clickable link to Solana Explorer;
+- an optional note, and a footer saying the payment was verified on chain.
+
+**Invoices never change.** Each is an append-only `issued_invoice` record with an `invoice.issued` event. Running `/invoice` again regenerates the same one; `correct: True` issues a new number whose PDF says which invoice it replaces. Numbers run in one sequence across all projects.
+
+**The PDF is written by our own small writer** (`src/domain/pdf.ts`): one A4 page, the Helvetica fonts every reader has, WinAnsi text (letters outside it lose their accents, so "Ayşe" prints as "Ayse"), lines, boxes and https links. No library, nothing embedded. Checked visually on 10 Nov by rendering it with macOS `sips`.
 
 ## Guides
 

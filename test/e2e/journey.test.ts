@@ -374,6 +374,24 @@ describe('a project from start to finish', () => {
     expect(receipt.embeds[0]?.fields?.[0]?.name).toBe('Payment 1: 0.01 USDC');
   });
 
+  it('12b. Boran makes the invoice for the organisers; it never changes once issued', async () => {
+    const year = new Date().getUTCFullYear();
+    expect(said(await run(CLIENT, channel, 'invoice', { billed_to: 'Ahmet Barbers' }))).toBe('Only Furkan can do this.');
+    const first = said(await run(BORAN, channel, 'invoice', { billed_to: 'Ahmet Barbers Ltd | 1 High Street, London', note: 'Thank you!' }));
+    expect(first).toContain(`Invoice **DL-${year}-0001** is in https://discord.com/channels/`);
+    const desk = guild.channelNamed('owner-desk');
+    expect(desk.history.at(-1)?.files).toEqual([`DL-${year}-0001.pdf`]);
+    expect(desk.history.at(-1)?.content).toContain('0.01 USDC, paid');
+
+    const again = said(await run(BORAN, channel, 'invoice', { billed_to: 'Someone Else' }));
+    expect(again).toContain(`already has invoice **DL-${year}-0001**`);
+    expect(desk.history.at(-1)?.files).toEqual([`DL-${year}-0001.pdf`]);
+
+    const corrected = said(await run(BORAN, channel, 'invoice', { billed_to: 'Ahmet Barbers Limited', correct: true }));
+    expect(corrected).toContain(`Invoice **DL-${year}-0002**`);
+    expect(desk.history.at(-1)?.content).toContain(`It replaces DL-${year}-0001.`);
+  });
+
   it('13. Boran starts building; the client checks progress', async () => {
     expect(said(await run(CLIENT, channel, 'start-development'))).toBe('Only Furkan can do this.');
     await run(BORAN, channel, 'start-development');
@@ -548,6 +566,7 @@ describe('a project from start to finish', () => {
     expect(touches).toContain('posted quote v1 for booking-app');
     expect(touches).toContain('had the AI assistant answer client questions on booking-app');
     expect(touches).toContain('updated the project docs for booking-app in a pull request');
+    expect(touches).toContain('issued the invoice for booking-app');
   });
 
   it('18. The record: every step is an event, and memory heard the key moments', async () => {
@@ -566,6 +585,7 @@ describe('a project from start to finish', () => {
       'payment.requested',
       'payment.rejected',
       'payment.verified',
+      'invoice.issued',
       'development.started',
       'status.checked',
       'ask.answered',

@@ -172,3 +172,25 @@ DEFINE FIELD OVERWRITE used_by ON invite TYPE option<string>;
 DEFINE FIELD OVERWRITE created_at ON invite TYPE datetime DEFAULT time::now() READONLY;
 DEFINE FIELD OVERWRITE updated_at ON invite TYPE datetime VALUE time::now();
 DEFINE INDEX OVERWRITE invite_code ON invite FIELDS code UNIQUE;
+
+-- Invoices (append-only) ----------------------------------------------------------
+-- One record per invoice issued with /invoice. Never changed: a correction is a new
+-- invoice whose `replaces` names the old one.
+
+DEFINE TABLE OVERWRITE issued_invoice SCHEMAFULL;
+DEFINE FIELD OVERWRITE number ON issued_invoice TYPE string;
+DEFINE FIELD OVERWRITE sequence ON issued_invoice TYPE int ASSERT $value >= 1;
+DEFINE FIELD OVERWRITE project ON issued_invoice TYPE record<project>;
+DEFINE FIELD OVERWRITE billed_to ON issued_invoice TYPE array<string>;
+DEFINE FIELD OVERWRITE amount_micro ON issued_invoice TYPE int ASSERT $value > 0;
+DEFINE FIELD OVERWRITE quote_version ON issued_invoice TYPE int;
+DEFINE FIELD OVERWRITE spec_version ON issued_invoice TYPE int;
+DEFINE FIELD OVERWRITE payments ON issued_invoice TYPE array<string>;
+DEFINE FIELD OVERWRITE note ON issued_invoice TYPE option<string>;
+DEFINE FIELD OVERWRITE replaces ON issued_invoice TYPE option<string>;
+DEFINE FIELD OVERWRITE issued_at ON issued_invoice TYPE datetime VALUE time::now() READONLY;
+DEFINE INDEX OVERWRITE issued_invoice_number ON issued_invoice FIELDS number UNIQUE;
+DEFINE INDEX OVERWRITE issued_invoice_sequence ON issued_invoice FIELDS sequence UNIQUE;
+DEFINE EVENT OVERWRITE append_only ON issued_invoice WHEN $event IN ["UPDATE", "DELETE"] THEN {
+  THROW "invoice records are append-only";
+};

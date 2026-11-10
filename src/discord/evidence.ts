@@ -162,6 +162,7 @@ const PHRASES: Record<string, (project: string, data: Record<string, unknown>) =
   'question.answered': (p) => `had the AI assistant answer client questions on ${p}`,
   'call.recorded': (p) => `had a call with the client of ${p} (recorded and transcribed with consent)`,
   'docs.synced': (p) => `updated the project docs for ${p} in a pull request`,
+  'invoice.issued': (p) => `issued the invoice for ${p}`,
   'project.claude_connected': (p) => `connected my Claude Code session to ${p}`,
   'dev.update_posted': (p) => `built ${p} with Claude Code, which posted progress updates for the client`,
   'project.cancelled': (p) => `cancelled ${p}`,

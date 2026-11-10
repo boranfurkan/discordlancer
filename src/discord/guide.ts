@@ -118,6 +118,11 @@ export const GUIDE: Record<string, GuideEntry> = {
     owner: 'The receipt for a paid project: amount, transaction and explorer link.',
     client: 'Your receipt: the amount and the transaction, with a link to see it on the blockchain.',
   },
+  invoice: {
+    phase: 'payment',
+    owner:
+      "Once the payment is confirmed: a PDF invoice in #owner-desk (number, date, you, the client as you write them in `billed_to`, the agreed spec and quote, the USDC amount, and the payment's transaction with a link, marked paid). Send it to the organisers in your team channel; they confirm payments with it. Separate lines with |, like `Acme Ltd | 1 High St, London`. Running it again gives the same invoice; `correct: True` issues a new number replacing it.",
+  },
   'start-development': {
     phase: 'build',
     owner: 'Marks that building has started (stage Being built). Do it once the payment is confirmed.',
