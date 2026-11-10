@@ -232,3 +232,33 @@ DEFINE INDEX OVERWRITE file_note_posted ON file_note FIELDS project, posted_at;
 DEFINE EVENT OVERWRITE append_only ON file_note WHEN $event IN ["UPDATE", "DELETE"] THEN {
   THROW "file notes are append-only";
 };
+
+-- Repo reviews (append-only) -------------------------------------------------------
+-- /review-repo: AI reference notes on an existing codebase (the client's current app,
+-- or one they pointed to), at one commit. A later review of the same repo is a new
+-- record; the newest one per repo is used.
+
+DEFINE TABLE OVERWRITE repo_review SCHEMAFULL;
+DEFINE FIELD OVERWRITE project ON repo_review TYPE record<project>;
+-- "owner/name" for GitHub, "upload/<name>" for a zip posted in the chat.
+DEFINE FIELD OVERWRITE repo ON repo_review TYPE string;
+DEFINE FIELD OVERWRITE source ON repo_review TYPE string ASSERT $value IN ["github", "zip"];
+DEFINE FIELD OVERWRITE url ON repo_review TYPE option<string>;
+DEFINE FIELD OVERWRITE branch ON repo_review TYPE string;
+DEFINE FIELD OVERWRITE commit ON repo_review TYPE string;
+DEFINE FIELD OVERWRITE about ON repo_review TYPE string;
+DEFINE FIELD OVERWRITE summary ON repo_review TYPE string;
+DEFINE FIELD OVERWRITE markdown ON repo_review TYPE string;
+DEFINE FIELD OVERWRITE reuse ON repo_review TYPE array<string>;
+DEFINE FIELD OVERWRITE risks ON repo_review TYPE array<string>;
+DEFINE FIELD OVERWRITE questions ON repo_review TYPE array<string>;
+DEFINE FIELD OVERWRITE files_listed ON repo_review TYPE int;
+DEFINE FIELD OVERWRITE files_read ON repo_review TYPE int;
+DEFINE FIELD OVERWRITE doc_path ON repo_review TYPE string;
+DEFINE FIELD OVERWRITE model ON repo_review TYPE string;
+DEFINE FIELD OVERWRITE prompt_version ON repo_review TYPE string;
+DEFINE FIELD OVERWRITE created_at ON repo_review TYPE datetime VALUE time::now() READONLY;
+DEFINE INDEX OVERWRITE repo_review_project ON repo_review FIELDS project, created_at;
+DEFINE EVENT OVERWRITE append_only ON repo_review WHEN $event IN ["UPDATE", "DELETE"] THEN {
+  THROW "repo reviews are append-only";
+};

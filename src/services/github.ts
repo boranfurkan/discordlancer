@@ -71,8 +71,11 @@ export function matchPullForIssue(pulls: readonly RawPull[], issue: number): Pul
 export interface GitHubApi {
   ensureRepo(name: string, description: string): Promise<RepoInfo>;
   addCollaborator(repo: string, username: string): Promise<CollaboratorResult>;
-  /** The default branch's file list and the contents of the files chooseFiles() picks. */
-  readRepo(repo: string): Promise<RepoSnapshot>;
+  /**
+   * A branch's file list (the default one unless `ref` is given) and the contents of the
+   * files chooseFiles() picks. Works on any repo the token can see, including public ones.
+   */
+  readRepo(repo: string, options?: { ref?: string | undefined; limits?: SnapshotLimits; rank?: (path: string) => number }): Promise<RepoSnapshot>;
   /** Opens an issue, then adds the labels in a second call (creating them if missing). */
   openIssue(repo: string, title: string, body: string, labels: string[]): Promise<{ number: number; url: string }>;
   /** The pull request opened for this issue, if there is one yet. */
@@ -112,28 +115,57 @@ const SKIP_DIRS = /(^|\/)(node_modules|dist|build|out|coverage|vendor|\.git|\.ne
 const SKIP_FILES = /(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb|\.min\.(js|css)|\.map)$/;
 const BINARY = /\.(png|jpe?g|gif|webp|ico|svg|pdf|zip|gz|woff2?|ttf|otf|mp4|mp3|wav|jar|exe|dll|so|dylib|lockb)$/i;
 
-export const SNAPSHOT_LIMITS = { maxFiles: 40, maxFileBytes: 30_000, maxTotalBytes: 300_000 };
+export interface SnapshotLimits {
+  maxFiles: number;
+  maxFileBytes: number;
+  maxTotalBytes: number;
+}
 
-/** Pure: which files to read for a status check, most useful first, within the limits. */
-export function chooseFiles(tree: ReadonlyArray<{ path: string; size: number }>): string[] {
+export const SNAPSHOT_LIMITS: SnapshotLimits = { maxFiles: 40, maxFileBytes: 30_000, maxTotalBytes: 300_000 };
+/** For /review-repo: a much deeper read of someone else's codebase. */
+export const REVIEW_LIMITS: SnapshotLimits = { maxFiles: 160, maxFileBytes: 60_000, maxTotalBytes: 900_000 };
+
+const statusRank = (path: string) => {
+  if (/^readme/i.test(path)) return 0;
+  if (/^(package\.json|pyproject\.toml|go\.mod|Cargo\.toml)$/.test(path)) return 1;
+  if (/^(src|app|lib|pages|components|server|api)\//.test(path)) return 2;
+  return 3;
+};
+
+/** For reviews: what explains a codebase first (docs, manifests, schemas, config), then its code. */
+export const reviewRank = (path: string): number => {
+  const name = path.split('/').pop() ?? '';
+  if (/^readme/i.test(name) && !path.includes('/')) return 0;
+  if (/(^|\/)(tests?|test-d|__tests__|__mocks__|specs?|e2e|fixtures?|examples?)\//i.test(path) || /\.(test|spec)\.[a-z]+$/i.test(name)) return 7;
+  if (/^(package\.json|pyproject\.toml|requirements\.txt|go\.mod|Cargo\.toml|Gemfile|composer\.json|pubspec\.yaml|build\.gradle(\.kts)?|Podfile|tsconfig\.json|\.env\.example|docker-compose\.ya?ml|Dockerfile)$/.test(name) && path.split('/').length <= 2) return 1;
+  if (/(^|\/)(docs?|documentation)\//i.test(path) || (/\.md$/i.test(name) && !path.includes('/')) || /^readme/i.test(name)) return 2;
+  if (/(schema|migration|models?|entities|prisma|types?)\b/i.test(path) || /\.(prisma|sql|graphql|gql|proto)$/.test(name)) return 3;
+  if (/(^|\/)(routes?|api|controllers?|server|services?|handlers?)\//i.test(path)) return 4;
+  if (/(^|\/)(src|app|lib|pages|components|screens|views)\//i.test(path)) return 5;
+  return 6;
+};
+
+/** Pure: which files to read, most useful first, within the limits. */
+export function chooseFiles(tree: ReadonlyArray<{ path: string; size: number }>, limits: SnapshotLimits = SNAPSHOT_LIMITS, rank: (path: string) => number = statusRank): string[] {
   const candidates = tree.filter(
-    (entry) => !SKIP_DIRS.test(entry.path) && !SKIP_FILES.test(entry.path) && !BINARY.test(entry.path) && entry.size <= SNAPSHOT_LIMITS.maxFileBytes,
+    (entry) => !SKIP_DIRS.test(entry.path) && !SKIP_FILES.test(entry.path) && !BINARY.test(entry.path) && entry.size <= limits.maxFileBytes,
   );
-  const rank = (path: string) => {
-    if (/^readme/i.test(path)) return 0;
-    if (/^(package\.json|pyproject\.toml|go\.mod|Cargo\.toml)$/.test(path)) return 1;
-    if (/^(src|app|lib|pages|components|server|api)\//.test(path)) return 2;
-    return 3;
-  };
   const sorted = [...candidates].sort((a, b) => rank(a.path) - rank(b.path) || a.path.split('/').length - b.path.split('/').length || a.path.localeCompare(b.path));
   const chosen: string[] = [];
   let total = 0;
   for (const entry of sorted) {
-    if (chosen.length >= SNAPSHOT_LIMITS.maxFiles || total + entry.size > SNAPSHOT_LIMITS.maxTotalBytes) continue;
+    if (chosen.length >= limits.maxFiles || total + entry.size > limits.maxTotalBytes) continue;
     chosen.push(entry.path);
     total += entry.size;
   }
   return chosen;
+}
+
+/** Runs `work` on every item, a few at a time, keeping the order. */
+async function inBatches<T, R>(items: readonly T[], size: number, work: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = [];
+  for (let start = 0; start < items.length; start += size) results.push(...(await Promise.all(items.slice(start, start + size).map(work))));
+  return results;
 }
 
 // GitHub usernames: letters, digits and single hyphens, up to 39 characters.
@@ -208,16 +240,15 @@ export function createGitHub(
       }
     },
 
-    async readRepo(repo) {
+    async readRepo(repo, options = {}) {
       const [repoOwner, repoName] = repo.split('/');
       if (!repoOwner || !repoName) throw new GitHubError(`Bad repo name ${repo}`);
       const { data: info } = await octokit.rest.repos.get({ owner: repoOwner, repo: repoName, ...signal() });
-      const branch = info.default_branch;
+      const branch = options.ref ?? info.default_branch;
       const { data: ref } = await octokit.rest.repos.getBranch({ owner: repoOwner, repo: repoName, branch, ...signal() });
       const { data: tree } = await octokit.rest.git.getTree({ owner: repoOwner, repo: repoName, tree_sha: ref.commit.sha, recursive: 'true', ...signal() });
       const blobs = tree.tree.filter((entry) => entry.type === 'blob' && entry.path).map((entry) => ({ path: entry.path!, size: entry.size ?? 0 }));
-      const files: RepoSnapshot['files'] = [];
-      for (const path of chooseFiles(blobs)) {
+      const files = await inBatches(chooseFiles(blobs, options.limits, options.rank), 6, async (path) => {
         const { data } = await octokit.rest.repos.getContent({
           owner: repoOwner,
           repo: repoName,
@@ -226,8 +257,8 @@ export function createGitHub(
           mediaType: { format: 'raw' },
           ...signal(),
         });
-        files.push({ path, content: typeof data === 'string' ? data : '' });
-      }
+        return { path, content: typeof data === 'string' ? data : '' };
+      });
       return { branch, commit: ref.commit.sha, paths: blobs.map((blob) => blob.path), files };
     },
 

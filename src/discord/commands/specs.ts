@@ -15,6 +15,8 @@ import { clientMentions, fitMessage } from '../texts.js';
 import { buildSpecInput, readConversation } from '../transcript.js';
 import { currentFileNotes } from '../files.js';
 import { renderFileNotes } from '../../files/noteText.js';
+import { referenceReviewsFor } from '../../db/references.js';
+import { renderReferences } from '../references.js';
 
 const createDescription = 'Write the next spec version from this conversation (AI-drafted)';
 
@@ -45,7 +47,8 @@ export const createSpecs: Command = {
     // Anything shared while the bot was down is read now, so the spec sees every file.
     const notes = await currentFileNotes(ctx, project, interaction.channel);
     const noted = new Set(notes.filter((note) => note.source === 'attachment' && note.status === 'read').map((note) => note.source_id));
-    const { input, plan } = await buildSpecInput(messages, previous, memory, calls, { text: renderFileNotes(notes), noted });
+    const references = renderReferences(await referenceReviewsFor(ctx.db, project));
+    const { input, plan } = await buildSpecInput(messages, previous, memory, calls, { text: renderFileNotes(notes), noted }, references);
 
     let output;
     try {

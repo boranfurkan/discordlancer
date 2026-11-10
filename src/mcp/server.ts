@@ -12,6 +12,7 @@ import { changeRequestsFor } from '../db/changes.js';
 import { agreedParties, latestQuote, latestSpec } from '../db/deals.js';
 import { countEventsSince, eventsForProject, recordEvent } from '../db/events.js';
 import { fileNotesFor } from '../db/files.js';
+import { referenceReviewsFor } from '../db/references.js';
 import { paymentsFor } from '../db/payments.js';
 import { getProjectByDevKeyHash, type Project } from '../db/projects.js';
 import { londonDayStart } from '../domain/deadline.js';
@@ -105,7 +106,7 @@ export function chooseProtocolVersion(requested: unknown): string {
 }
 
 async function brief(deps: McpDeps, project: Project, now: Date): Promise<ToolResult> {
-  const [spec, quote, payments, changes, events, updatesToday, files] = await Promise.all([
+  const [spec, quote, payments, changes, events, updatesToday, files, references] = await Promise.all([
     latestSpec(deps.db, project),
     latestQuote(deps.db, project),
     paymentsFor(deps.db, project),
@@ -113,6 +114,7 @@ async function brief(deps: McpDeps, project: Project, now: Date): Promise<ToolRe
     eventsForProject(deps.db, project.id),
     countEventsSince(deps.db, project.id, UPDATE_ACTION, londonDayStart(now)),
     fileNotesFor(deps.db, project),
+    referenceReviewsFor(deps.db, project),
   ]);
   const specAgreed = spec ? [...(await agreedParties(deps.db, project, 'spec', spec.version))] : [];
   const quoteAgreed = quote ? [...(await agreedParties(deps.db, project, 'quote', quote.version))] : [];
@@ -130,6 +132,7 @@ async function brief(deps: McpDeps, project: Project, now: Date): Promise<ToolRe
       updates,
       updatesToday,
       files,
+      references,
     }),
   );
 }

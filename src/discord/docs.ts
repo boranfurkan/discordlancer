@@ -26,6 +26,8 @@ import { OWNER_NAME } from './guards.js';
 import { STAGE_LABEL } from './texts.js';
 import { conversationParts, readConversation, type ChatMessage } from './transcript.js';
 import { currentFileNotes } from './files.js';
+import { referenceReviewsFor } from '../db/references.js';
+import { renderReferences } from './references.js';
 
 export const DOCS_FOLDER = 'docs/project';
 export const DOCS_BRANCH = 'discordlancer/project-docs';
@@ -224,6 +226,7 @@ export async function writeDocs(ctx: BotContext, project: Project, channel: Text
     .map((event) => ({ at: event.at, summary: String(event.data?.summary) }));
   // Anything shared while the bot was down is read first, so the docs see every file.
   const shared = await currentFileNotes(ctx, project, channel);
+  const reviews = await referenceReviewsFor(ctx.db, project).catch(() => []);
   const noted = new Set(shared.filter((note) => note.source === 'attachment' && note.status === 'read').map((note) => note.source_id));
   const conversation = await conversationParts(messages, noted);
   const sources: DocsSources = {
@@ -236,6 +239,7 @@ export async function writeDocs(ctx: BotContext, project: Project, channel: Text
     updates,
     calls,
     files: shared,
+    references: renderReferences(reviews),
     memory,
     messages,
     conversation: conversation.text,
@@ -275,7 +279,7 @@ export async function writeDocs(ctx: BotContext, project: Project, channel: Text
     files,
     changeSummary: draft.change_summary,
     issues: review.issues,
-    citations: checkCitations(DOC_KEYS.map((key) => review[key]), knownSources(sources, quoteVersions)),
+    citations: checkCitations(DOC_KEYS.map((key) => review[key]), knownSources(sources, quoteVersions, reviews.map((item) => item.repo))),
     counts: {
       messages: messages.length,
       images: conversation.plan.images.length,

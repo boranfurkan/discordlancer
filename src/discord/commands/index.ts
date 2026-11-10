@@ -14,6 +14,7 @@ import { newProject } from './newProject.js';
 import { paid, pay, receipt, startDevelopment } from './pay.js';
 import { projectInfo } from './project.js';
 import { readFiles } from './readFiles.js';
+import { reviewRepo } from './reviewRepo.js';
 import { acceptQuote, quote } from './quote.js';
 import { agreeSpecs, createSpecs } from './specs.js';
 import { syncDocs } from './syncDocs.js';
@@ -42,6 +43,7 @@ export const COMMANDS: readonly Command[] = [
   ask,
   call,
   readFiles,
+  reviewRepo,
   syncDocs,
   requestUpdate,
   exportEvidence,

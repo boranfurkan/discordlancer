@@ -50,6 +50,11 @@ export const GUIDE: Record<string, GuideEntry> = {
       'The AI answers in the channel from the chat, calls, progress updates, spec, quote, payments, change requests, memory and the code, marked as an AI answer. It never agrees to new prices, dates or scope; anything needing you is flagged in #owner-desk. Clients get 15 a day per project; you have no limit.',
     client: `Ask anything about your project: what was agreed, how it is going, what comes next. The AI assistant answers in your channel from your conversation, calls, the spec and the code, and marks the answer as AI. It never agrees to new prices, dates or features: anything like that goes to ${OWNER_NAME}. Up to 15 questions a day.`,
   },
+  'review-repo': {
+    phase: 'start',
+    owner:
+      "Point the bot at an existing codebase: the client's current app, or one they referred to. Give a GitHub link (public, or one the bot's token can see) or, for a private one, a .zip of the code, plus a note on why it matters. Gemini reads up to 160 files and writes reference notes (stack, structure, data model, integrations, what to reuse, risks, questions), posted here and added to the project's repo as `docs/references/<name>.md` in a pull request. Specs, `/ask`, `/sync-docs` and Claude Code use them as context, never as requirements.",
+  },
   'read-files': {
     phase: 'anytime',
     owner:

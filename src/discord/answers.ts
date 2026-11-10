@@ -7,6 +7,8 @@ import type { Guild, TextChannel } from 'discord.js';
 import { callsFor, type Call } from '../db/calls.js';
 import { fileNotesFor, type FileNote } from '../db/files.js';
 import { renderFileNotes } from '../files/noteText.js';
+import { referenceReviewsFor, type RepoReview } from '../db/references.js';
+import { renderReferences } from './references.js';
 import { changeRequestsFor, type ChangeRequest } from '../db/changes.js';
 import { agreedParties, latestQuote, latestSpec, type Quote, type Spec } from '../db/deals.js';
 import { eventsForProject, recordEvent, type Actor } from '../db/events.js';
@@ -41,6 +43,7 @@ export interface AnswerContext {
   changes: readonly ChangeRequest[];
   calls?: readonly Call[];
   files?: readonly FileNote[];
+  references?: readonly RepoReview[];
   updates?: ReadonlyArray<{ at: Date; summary: string }>;
   memory: string;
   messages: readonly ChatMessage[];
@@ -94,6 +97,7 @@ export function renderAnswerInput(context: AnswerContext): string {
     context.updates?.length ? fence('progress_updates', context.updates.map((update) => `- ${update.at.toISOString().slice(0, 10)}: ${update.summary}`).join('\n')) : '',
     renderCalls(context.calls ?? []),
     renderFileNotes(context.files ?? [], { perFile: 8_000, total: 60_000 }),
+    renderReferences(context.references ?? [], { perRepo: 10_000, total: 30_000 }),
     trimmed,
     code,
     context.ownerNote ? fence('owner_note', context.ownerNote) : '',
@@ -107,6 +111,7 @@ const SOURCE_LABEL: Record<AnswerOutput['based_on'][number], string> = {
   chat: 'the chat',
   calls: 'the call notes',
   files: 'the shared files',
+  references: 'the reviewed codebases',
   updates: 'the progress updates',
   spec: 'the spec',
   quote: 'the quote',
@@ -138,7 +143,7 @@ export async function answerQuestion(
   question: string,
   ownerNote?: string,
 ): Promise<{ output: AnswerOutput; commit?: string | undefined }> {
-  const [spec, quote, payments, changes, calls, files, events, memory, messages, code] = await Promise.all([
+  const [spec, quote, payments, changes, calls, files, references, events, memory, messages, code] = await Promise.all([
     latestSpec(ctx.db, project),
     latestQuote(ctx.db, project),
     paymentsFor(ctx.db, project),
@@ -148,6 +153,7 @@ export async function answerQuestion(
       log.warn('could not load the file notes for an answer', { project: project.name, error });
       return [];
     }),
+    referenceReviewsFor(ctx.db, project).catch(() => []),
     eventsForProject(ctx.db, project.id),
     safeRecall(ctx.memory, projectScope(project.name), question),
     readConversation(channel, project.created_at, { ownerId: ctx.env.DISCORD_OWNER_ID, clientIds: clientMembers(project) }, { includeBot: true }),
@@ -167,6 +173,7 @@ export async function answerQuestion(
     changes,
     calls,
     files,
+    references,
     updates: events
       .filter((event) => event.action === 'dev.update_posted' && event.outcome === 'ok' && typeof event.data?.summary === 'string')
       .slice(-10)

@@ -24,6 +24,7 @@ import type { Env } from '../../src/env.js';
 import { STATUS_SYSTEM, TRIAGE_SYSTEM } from '../../src/prompts/after-delivery.js';
 import { SPEC_SYSTEM } from '../../src/prompts/specs.js';
 import { DOCS_REVIEW_SYSTEM, DOCS_SYSTEM } from '../../src/prompts/docs.js';
+import { REPO_REVIEW_SYSTEM } from '../../src/prompts/repoReview.js';
 import type { GeminiApi, JsonRequest } from '../../src/services/gemini.js';
 import type { GitHubApi, PullInfo, RepoFile } from '../../src/services/github.js';
 import type { MemoryApi } from '../../src/services/memory.js';
@@ -128,6 +129,16 @@ const geminiApi: GeminiApi = {
         : { answer: 'Booking a slot is in the agreed spec, and src/booking.ts has a book() function.', needs_owner: false, owner_note: '', confidence: 'medium', based_on: ['spec', 'code', 'chat'] };
     } else if (request.system === DOCS_SYSTEM) {
       answer = { ...fakeDocs(text), change_summary: github.docs.size ? [] : ['First version of the project docs'] };
+    } else if (request.system === REPO_REVIEW_SYSTEM) {
+      expect(text).toContain('<about>\nTheir old booking site; keep its customer list');
+      expect(text).toContain('<file path="src/booking.ts">');
+      answer = {
+        summary: 'An older booking site in TypeScript with one booking function.',
+        markdown: '# acme/old-booking: reference notes\n\n## What it is\nA small booking site (`src/booking.ts`).',
+        reuse: ['The book() function in `src/booking.ts`'],
+        risks: ['No tests'],
+        questions: ['Is the old site still live?'],
+      };
     } else if (request.system === DOCS_REVIEW_SYSTEM) {
       expect(text).toContain('<draft>');
       answer = { ...fakeDocs(text), issues: ['Removed a claim that SMS reminders were agreed'] };
@@ -487,6 +498,23 @@ describe('a project from start to finish', () => {
     expect(geminiInputs.at(-2)).toContain('<doc path="docs/project/README.md">');
   });
 
+  it('13d. Boran has the bot review the client\'s old codebase; the notes go to the repo and to /ask', async () => {
+    expect(said(await run(BORAN, channel, 'review-repo', { about: 'x', repo: 'boranfurkan/booking-app' }))).toContain("That's this project's own repo");
+    expect(said(await run(BORAN, channel, 'review-repo', { about: 'x' }))).toContain('Give either `repo`');
+    const reply = said(await run(BORAN, channel, 'review-repo', { about: 'Their old booking site; keep its customer list', repo: 'https://github.com/acme/old-booking' }));
+    expect(reply).toContain('🔎 **Reviewed `acme/old-booking`** at `abc1234` (1 files read)');
+    expect(reply).toContain('- The book() function in `src/booking.ts`');
+    expect(reply).toContain('Full notes: https://github.com/boranfurkan/booking-app/pull/7 (`docs/references/acme-old-booking.md`)');
+    expect(reply).toContain('AI review');
+    const commit = github.commits.at(-1)!;
+    expect(commit.branch).toBe('discordlancer/reference-acme-old-booking');
+    expect(commit.files[0]!.content).toContain('Why it matters: Their old booking site; keep its customer list');
+
+    await run(CLIENT, channel, 'ask', { question: 'What did the old site do?' });
+    expect(geminiInputs.at(-1)).toContain('<reference_repos>');
+    expect(geminiInputs.at(-1)).toContain('<repo name="acme/old-booking"');
+  });
+
   it('14. Boran marks delivery; only the client can confirm it', async () => {
     expect(said(await run(CLIENT, channel, 'confirm-delivery'))).toContain("hasn't marked it as delivered yet");
     const marked = await run(BORAN, channel, 'confirm-delivery', { note: 'Live at https://booking.example' });
@@ -591,6 +619,7 @@ describe('a project from start to finish', () => {
       'ask.answered',
       'question.answered',
       'docs.synced',
+      'repo.reviewed',
       'delivery.marked',
       'delivery.confirmed',
       'support.started',

@@ -116,6 +116,7 @@ SurrealDB 4 on SurrealDB Cloud (Earth): namespace `freelance`, database `bot`. E
 | `issued_invoice` | **Append-only:** invoice number (`DL-2026-0001`, one sequence), project, billed to, amount, quote and spec versions, payment signatures, note, the invoice it replaces | Number; sequence |
 | `invite` | Team invites from `/invite`: code, project, status (`open`, `used`), who used it | Code |
 | `call` | **Append-only:** project, start and end, participants (name, role, whether they agreed to be recorded), AI transcript, AI summary (decisions, action items, open questions), speech seconds, turns, model, prompt versions. Never the audio | |
+| `repo_review` | **Append-only:** `/review-repo` notes on an existing codebase: project, repo (`owner/name` or `upload/<zip>`), source, branch, commit, Boran's note on why it matters, AI summary, notes, reuse, risks, questions, files listed and read, doc path, model, prompt version. The newest per repo is used | |
 | `file_note` | **Append-only:** one per file or link shared in a project channel: who shared it and when, the message, name, kind, size, SHA-256, and either AI notes (title, summary, details, requirements, open questions, model, prompt version) or why it wasn't read. Never the file itself | Project + source (attachment ID, or message + link hash) |
 
 **Rules:**
@@ -313,6 +314,16 @@ Everything posted in a project channel (or its threads) by a person is read once
 - **Limits:** 40 reads per project per London day, two at a time across the bot. `/read-files` (owner) catches up on anything without notes; `/create-specs` and `/sync-docs` catch up on up to 10 messages first.
 - **Notes feed** `/create-specs` and `/sync-docs` (as `<files>`; images are still sent to them as pictures too), `/ask`, Claude Code's brief (newest first, about 24,000 characters), and `docs/project/files.md`. Docs cite a file as `[file roadmap.pdf, 2026-11-11 12:40]`, optionally with a place (`, p. 4`), and the citation check knows every file.
 - **Tested 10 Nov** with the real Gemini: a PDF (6 s), a Word file (4 s) and observv.com through the safe fetcher (10 s), each with sensible notes.
+
+## Reviewing an existing codebase
+
+Most projects start from scratch, but a client may have a current app, or point at one they like. `/review-repo about [repo] [zip]` (owner) reads it and writes reference notes for the new project (`src/discord/references.ts`).
+
+- **Sources:** a GitHub link or `owner/name` (public, or one the bot's token can see; a `/tree/<branch>` link reads that branch), or a `.zip` of the code for a private repo, so nobody shares a GitHub login. The project's own repo is refused (`/sync-docs` covers it).
+- **Reading:** up to 160 files and 900 KB, best first: the README, manifests and config, docs, schemas and types, API code, the rest of the code, tests last. Six files at a time from GitHub. A zip is read with our own zip reader, without its top folder, `node_modules` or macOS extras.
+- **Review:** Gemini (`repo-review-v1`, medium thinking) gets the new project's latest spec and shared-file notes, Boran's note, the file list and the files read, and writes notes: what it is, stack, structure, data model, APIs and integrations, how to run it, what the new project can reuse, gaps and risks, questions for the client. Secrets are named by file, never copied. Saved as an append-only `repo_review` with a `repo.reviewed` event.
+- **Then:** a summary in the channel (marked as an AI review), and a pull request on `discordlancer/reference-<name>` adding `docs/references/<name>.md` to the project's repo (not committed if the notes look like they hold a key). Specs, `/ask`, `/sync-docs` (citations like `[repo acme/old-app]`) and Claude Code's brief use the notes as context, never as requirements.
+- **Tested 10 Nov** with the real Gemini on a public repo: 108 of 115 files read in 9 s, reviewed in 37 s, every section filled with concrete paths.
 
 ## Project docs in the repo
 

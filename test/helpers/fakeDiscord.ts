@@ -264,7 +264,8 @@ export class FakeGuild {
   }
 }
 
-type Options = Record<string, string | boolean | Person | undefined>;
+type FakeAttachment = { name: string; size: number; url: string; contentType: string | null };
+type Options = Record<string, string | boolean | Person | FakeAttachment | undefined>;
 
 /** A slash command, run by a person in a channel. */
 export function commandInteraction(guild: FakeGuild, channel: FakeChannel, person: Person, commandName: string, options: Options = {}) {
@@ -287,6 +288,10 @@ export function commandInteraction(guild: FakeGuild, channel: FakeChannel, perso
       getString: (name: string) => (typeof options[name] === 'string' ? (options[name] as string) : null),
       getSubcommand: () => String(options.subcommand ?? ''),
       getBoolean: (name: string) => (typeof options[name] === 'boolean' ? (options[name] as boolean) : null),
+      getAttachment: (name: string) => {
+        const value = options[name];
+        return value && typeof value === 'object' && 'url' in value ? value : null;
+      },
       getUser: (name: string) => {
         const user = options[name] as Person | undefined;
         return user ? { id: user.id, bot: false, username: user.name } : null;
