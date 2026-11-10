@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 
-export const FILES_PROMPT_VERSION = 'files-v1';
+export const FILES_PROMPT_VERSION = 'files-v2';
 
 export const FILE_SYSTEM = `You read one file or web page that someone shared in a private Discord channel about a software project, between a freelance developer (Furkan) and a client. You write notes on it, so that the project's specs, docs and answers can use it later without opening the file again.
 
@@ -14,7 +14,7 @@ Write:
 - title: what the file is, in a few words, with its size when it helps ("Product roadmap deck, 14 slides", "Screenshot of the current booking page", "2-minute screen recording of the admin dashboard").
 - summary: two to four sentences: what it shows or says, and why it matters for the project, given the message it was shared with.
 - details: thorough notes in Markdown, enough that someone who never opens the file knows everything in it that matters for building the software: screens and their parts, flows step by step, features, data and fields, numbers, names, rules, branding (colours, fonts, logo), integrations, and anything technical. Point to where each thing is: "p. 4", "slide 3", "sheet Pricing", "at 01:12", or a heading. For a screenshot or design, describe the layout, every visible element and the text on it. For a video, what happens step by step with timestamps. For audio, what was said. For code or an archive, what it is, the stack, the structure and what it does. Leave out what doesn't matter for the project, such as legal boilerplate or cookie banners.
-- requirements: what the file asks for or implies the software must do, one short item each. Only what the file actually supports; nothing invented.
+- requirements: what the file asks for or implies the software must do, one short item each. Only what the file actually supports; nothing invented. When it asks for nothing (background reading, an article, a competitor's site), leave the list empty rather than saying so in an item.
 - open_questions: what is unclear, missing or contradictory and worth asking the client.
 
 Rules:
