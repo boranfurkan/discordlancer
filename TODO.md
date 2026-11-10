@@ -249,7 +249,15 @@ Skills: the `tessl__*` skills, `gemini-api-dev`, `surrealdb-agent-memory-docs`.
 - [x] MCP endpoint at `/mcp` on the bot's web port, with a key per project: `get_project_brief` and `post_update`. See `PLAN.md`, Progress updates from Claude Code.
 - [x] `npm run claude:connect -- <project> [folder]`: clone, key, `claude mcp add` for that folder only, `CLAUDE.md` section and `/update-client`.
 - [x] Checked locally against the official MCP client (handshake on protocol 2025-11-25, both tools, an update posted), and a real Claude Code session connected and read the brief.
-- [ ] **After deploying:** on the first real project, run `claude:connect` (its live check calls the bot), then post the first real update from the build session.
+- [x] **Live check on Replit (10 Nov)** with a test project, `dl-test-updates`:
+  - `claude:connect` cloned the repo, made the key and connected Claude Code, and its live check passed;
+  - a real Claude Code session ran `/update-client` and the update appeared in the channel, marked as AI-written and pinging nobody;
+  - the event was recorded, the brief showed the update, and memory recalled it;
+  - refused as intended: a wrong or missing key, an update containing a GitHub token, an overlong update, and a 7th update in one day;
+  - running `claude:connect` again turned the old key off.
+
+  Reset afterwards (backup in `backups/`). Lesson: the reset must retry applying the schema, because the live bot uses the database at the same time.
+- [ ] **Boran:** delete the test repo `boranfurkan/dl-test-updates` (neither the bot's GitHub token nor `gh` may delete repos).
 
 **Tried live on 9 Nov (overnight)** on `dl-test-gamma`:
 - `/progress` gave "about 0%", correctly, with the spec's features listed as still to do;
