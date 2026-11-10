@@ -380,8 +380,8 @@ describe('a project from start to finish', () => {
     expect(channel.botText().at(-1)).toContain('Payment received: **0.01 USDC**');
     expect(guild.channelNamed('owner-desk').botText().at(-1)).toContain('USDC sales are reported by hand');
     expect(await listOpenRequests(db)).toHaveLength(0);
-    // /paid with the same signature is refused: it's already recorded.
-    expect(said(await run(CLIENT, channel, 'paid', { signature: 'SigGood'.padEnd(88, '1') }))).toContain("That can't be done at this stage (Paid)");
+    // Once it's paid in full, /paid has nothing left to check.
+    expect(said(await run(CLIENT, channel, 'paid', { signature: 'SigGood'.padEnd(88, '1') }))).toContain('Nothing is due: this project is paid in full.');
     const receipt = (await run(CLIENT, channel, 'receipt')).replies[0]!;
     expect(receipt.embeds[0]?.fields?.[0]?.name).toBe('Payment 1: 0.01 USDC');
   });

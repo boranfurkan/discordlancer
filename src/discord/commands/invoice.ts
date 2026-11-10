@@ -57,7 +57,9 @@ export const invoice: Command = {
     if (payments.length === 0) throw new UserError("Invoices are made once a payment is confirmed, and this project hasn't had one yet.");
 
     let record = existing;
-    if (!record || correct) {
+    // After a deposit, the balance payment needs a new invoice listing both: it replaces the last one.
+    const newPayment = existing !== undefined && payments.some((payment) => !existing.payments.includes(payment.signature));
+    if (!record || correct || newPayment) {
       const accepted = [...quotes].reverse().find((quote) => agreements.some((item) => item.kind === 'quote' && item.version === quote.version && item.party === 'client'));
       if (!accepted) throw new UserError('This project has no accepted quote to invoice.');
       record = await issueInvoice(
@@ -111,7 +113,7 @@ export const invoice: Command = {
     });
     await interaction.editReply(
       fresh
-        ? `Invoice **${record.number}** is in ${posted.url}`
+        ? `Invoice **${record.number}** is in ${posted.url}${newPayment && !correct ? `\nIt replaces ${existing!.number}, which didn't include the latest payment.` : ''}`
         : `This project already has invoice **${record.number}**, so here it is again: ${posted.url}\nTo change it, run \`/invoice\` with \`correct: True\`; that issues a new number replacing it.`,
     );
   },

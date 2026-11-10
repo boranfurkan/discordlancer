@@ -19,6 +19,8 @@ import { clientMentions } from '../texts.js';
 import { requireProject, UserError, type BotContext, type Command } from '../command.js';
 import { OWNER_NAME } from '../guards.js';
 import { projectScope, safeRemember } from '../../services/memory.js';
+import { formatUsdc } from '../../domain/money.js';
+import { dueNow } from '../payments.js';
 
 export const CONFIRM_DELIVERY_BUTTON = 'dl:confirm-delivery';
 
@@ -33,10 +35,12 @@ function confirmRow(disabled: boolean) {
 }
 
 /** Pure check shared by the button and the command: may this person confirm now? */
-export function canConfirm(project: Pick<Project, 'stage' | 'client_id' | 'client_ids' | 'delivery_marked_at'>, userId: string): string | undefined {
+export function canConfirm(project: Pick<Project, 'stage' | 'client_id' | 'client_ids' | 'delivery_marked_at'>, userId: string, dueMicro = 0): string | undefined {
   if (project.stage !== 'in_development') return "This project isn't waiting for a delivery confirmation.";
   if (!isClientMember(project, userId)) return 'Only the client confirms the delivery.';
   if (!project.delivery_marked_at) return `${OWNER_NAME} hasn't marked it as delivered yet.`;
+  // With a deposit, the rest is paid on delivery, before it is confirmed (the quote's terms).
+  if (dueMicro > 0) return `The remaining ${formatUsdc(dueMicro)} USDC is due before the delivery is confirmed. Pay it with /pay, then confirm.`;
   return undefined;
 }
 
@@ -91,17 +95,20 @@ export const confirmDelivery: Command = {
         { actor: 'owner', actorId: interaction.user.id, action: 'delivery.marked', outcome: 'ok', ...(note ? { data: { note } } : {}) },
       );
       const client = clientMentions(project);
+      const due = await dueNow(ctx, project);
       await interaction.reply({
         content: [
           `${OWNER_NAME} has marked **${project.name}** as delivered.${note ? `\n> ${note}` : ''}`,
-          `${client}, please check it against the agreed spec, then confirm with the button below or with /confirm-delivery. If something is missing, say so here instead.`,
+          due
+            ? `${client}, please check it against the agreed spec. The remaining **${formatUsdc(due.amountMicro)} USDC** is now due: pay it with /pay, then confirm with the button below or with /confirm-delivery. If something is missing, say so here instead.`
+            : `${client}, please check it against the agreed spec, then confirm with the button below or with /confirm-delivery. If something is missing, say so here instead.`,
         ].join('\n'),
         components: [confirmRow(false)],
       });
       return;
     }
 
-    const problem = canConfirm(project, interaction.user.id);
+    const problem = canConfirm(project, interaction.user.id, (await dueNow(ctx, project))?.amountMicro);
     if (problem) throw new UserError(problem);
     await confirm(ctx, interaction.guild, project, interaction.user.id);
     await interaction.reply(`<@${interaction.user.id}> confirmed the delivery of **${project.name}**. Thank you! Small changes can be asked for later.`);
@@ -112,7 +119,7 @@ export const confirmDelivery: Command = {
 export async function onConfirmDeliveryButton(interaction: ButtonInteraction<'cached'>, ctx: BotContext): Promise<void> {
   if (interaction.channel?.type !== ChannelType.GuildText) return;
   const project = await getProjectByChannel(ctx.db, interaction.channelId);
-  const problem = project ? canConfirm(project, interaction.user.id) : 'This only works in a project channel.';
+  const problem = project ? canConfirm(project, interaction.user.id, (await dueNow(ctx, project))?.amountMicro) : 'This only works in a project channel.';
   if (problem || !project) {
     await interaction.reply({ content: problem ?? 'This only works in a project channel.', flags: MessageFlags.Ephemeral });
     return;

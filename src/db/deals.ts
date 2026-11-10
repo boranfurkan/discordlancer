@@ -29,6 +29,8 @@ export const QuoteRow = z.object({
   deadline: toDate,
   spec_version: z.number().int(),
   terms: z.string(),
+  /** A deposit paid before work starts; the rest is paid on delivery. */
+  deposit_micro: z.number().int().optional(),
   created_at: toDate,
 });
 export type Quote = z.infer<typeof QuoteRow>;
@@ -118,6 +120,7 @@ export interface NewQuote {
   deadline: Date;
   specVersion: number;
   terms: string;
+  depositMicro?: number | undefined;
 }
 
 /**
@@ -150,6 +153,7 @@ export async function saveQuote(
           deadline: quote.deadline,
           spec_version: quote.specVersion,
           terms: quote.terms,
+          ...(quote.depositMicro ? { deposit_micro: quote.depositMicro } : {}),
         },
         agreement: { project: project.id, kind: 'quote', version, party: 'owner', user_id: ownerId },
         event: eventContent(
@@ -159,6 +163,7 @@ export async function saveQuote(
               ...event.data,
               version,
               amount_micro: quote.amountMicro,
+              ...(quote.depositMicro ? { deposit_micro: quote.depositMicro } : {}),
               ...(project.stage === 'quote_accepted' ? { stage_reset_from: project.stage } : {}),
             },
           },

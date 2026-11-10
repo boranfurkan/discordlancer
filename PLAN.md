@@ -108,9 +108,9 @@ SurrealDB 4 on SurrealDB Cloud (Earth): namespace `freelance`, database `bot`. E
 | `project` | Name, Discord channel ID, repo (`owner/name`), invite code, client's Discord ID (the first), the rest of the client's team (`client_ids`), GitHub username and declared wallet, stage, the SHA-256 of its Claude Code key, timestamps | Name; channel ID |
 | `event` | **Append-only log:** time, project, actor (`owner`, `client` or `bot`), actor's Discord ID, action, data, outcome (`ok`, `refused`, `failed`) | |
 | `spec` | Project, version, markdown, what changed, open questions, model, prompt version, how many messages it read | Project + version |
-| `quote` | Project, version, amount (micro-USDC), deadline, spec version, terms | Project + version |
+| `quote` | Project, version, amount (micro-USDC), optional deposit (less than the amount), deadline, spec version, terms | Project + version |
 | `agreement` | Project, kind (`spec` or `quote`), version, party (`owner` or `client`), Discord ID, time | Project + kind + version + party |
-| `payment_request` | Project, quote version, amount, reference key, status (`open`, `paid`, `expired`) | Reference |
+| `payment_request` | Project, quote version, part (`full`, `deposit` or `balance`; none on older ones means full), amount, reference key, status (`open`, `paid`, `expired`) | Reference |
 | `payment` | Project, request, signature, from wallet, to wallet, amount, slot, block time, verified time | Signature |
 | `change_request` | Project, text, Gemini's triage, status, issue number, PR number | |
 | `issued_invoice` | **Append-only:** invoice number (`DL-2026-0001`, one sequence), project, billed to, amount, quote and spec versions, payment signatures, note, the invoice it replaces | Number; sequence |
@@ -216,6 +216,12 @@ Based on the `solana-dev` skill's payment guidance.
 7. **`/paid signature`** is the fallback for a manual send that has no reference. It runs the same checks on that one transaction.
 
 The bot never holds a private key, signs or sends anything. It only reads the chain.
+
+**Deposits** (added 10 Nov, for clients who won't pay a new freelancer everything up front). `/quote amount deadline deposit:50` stores a deposit (a whole percentage from 10 to 90, rounded to the cent; the schema refuses a deposit that isn't less than the price), and the terms say: the deposit before work starts, the rest on delivery before the client confirms it, and the code is theirs once the full price is paid. What's due comes from one pure rule (`src/domain/deposit.ts`): the deposit first, then the price less what's been paid, then nothing.
+- `/pay` and `/paid` ask for what's due, with a request for that part. The deposit moves the project to `paid` as before, so work starts. The balance can be paid while the project is paid or being built; it doesn't change the stage, and the watcher checks balance requests at those stages.
+- When Boran marks the delivery, the message says the balance is now due; the client can't confirm the delivery until it's paid.
+- The channel says "Deposit received" (with what's left), then "Final payment received". Boran gets the organisers' reminder for each payment: each one is reported by hand with its hash.
+- `/invoice` after a new payment issues a new invoice listing every payment, replacing the last one (PAID once nothing is due, PART PAID before).
 
 ## Gemini
 

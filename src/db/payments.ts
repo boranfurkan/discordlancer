@@ -15,6 +15,8 @@ export const PaymentRequestRow = z.object({
   quote_version: z.number().int(),
   amount_micro: z.number().int(),
   reference: z.string(),
+  /** The whole price, a deposit, or the balance after one. Older requests have none: the whole price. */
+  part: z.enum(['full', 'deposit', 'balance']).optional().transform((value) => value ?? 'full'),
   status: z.enum(['open', 'paid', 'expired']),
   created_at: toDate,
 });
@@ -36,12 +38,13 @@ export type Payment = z.infer<typeof PaymentRow>;
 
 type ProjectRef = Pick<Project, 'id'>;
 
-export async function openRequest(db: Surreal, project: ProjectRef, quoteVersion: number): Promise<PaymentRequest | undefined> {
+/** The open request for this quote version and part (the whole price unless a part is given). */
+export async function openRequest(db: Surreal, project: ProjectRef, quoteVersion: number, part: PaymentRequest['part'] = 'full'): Promise<PaymentRequest | undefined> {
   const [rows] = await db.query<[unknown[]]>(
-    'SELECT * FROM payment_request WHERE project = $p AND quote_version = $v AND status = "open" ORDER BY created_at DESC LIMIT 1',
+    'SELECT * FROM payment_request WHERE project = $p AND quote_version = $v AND status = "open" ORDER BY created_at DESC',
     { p: project.id, v: quoteVersion },
   );
-  return rows[0] === undefined ? undefined : PaymentRequestRow.parse(rows[0]);
+  return rows.map((row) => PaymentRequestRow.parse(row)).find((request) => request.part === part);
 }
 
 export async function listOpenRequests(db: Surreal): Promise<PaymentRequest[]> {
@@ -56,28 +59,30 @@ export async function listOpenRequests(db: Surreal): Promise<PaymentRequest[]> {
 export async function createRequest(
   db: Surreal,
   project: ProjectRef,
-  request: { quoteVersion: number; amountMicro: number; reference: string },
+  request: { quoteVersion: number; amountMicro: number; reference: string; part?: PaymentRequest['part'] },
   event: Omit<EventInput, 'project'>,
 ): Promise<PaymentRequest> {
   const id = new RecordId('payment_request', request.reference);
   await db.query(
     `BEGIN TRANSACTION;
-     UPDATE payment_request SET status = "expired" WHERE project = $p AND status = "open" AND quote_version != $v RETURN NONE;
+     UPDATE payment_request SET status = "expired" WHERE project = $p AND status = "open" AND (quote_version != $v OR (part ?? "full") != $part) RETURN NONE;
      CREATE ONLY $id CONTENT $content RETURN NONE;
      CREATE event CONTENT $event RETURN NONE;
      COMMIT TRANSACTION;`,
     {
       p: project.id,
       v: request.quoteVersion,
+      part: request.part ?? 'full',
       id,
       content: {
         project: project.id,
         quote_version: request.quoteVersion,
         amount_micro: request.amountMicro,
         reference: request.reference,
+        ...(request.part && request.part !== 'full' ? { part: request.part } : {}),
         status: 'open',
       },
-      event: eventContent({ ...event, data: { ...event.data, quote_version: request.quoteVersion, reference: request.reference } }, project.id),
+      event: eventContent({ ...event, data: { ...event.data, quote_version: request.quoteVersion, reference: request.reference, ...(request.part && request.part !== 'full' ? { part: request.part } : {}) } }, project.id),
     },
   );
   const [rows] = await db.query<[unknown[]]>('SELECT * FROM $id', { id });

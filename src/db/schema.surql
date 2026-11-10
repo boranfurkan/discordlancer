@@ -72,6 +72,8 @@ DEFINE FIELD OVERWRITE amount_micro ON quote TYPE int ASSERT $value > 0;
 DEFINE FIELD OVERWRITE deadline ON quote TYPE datetime;
 DEFINE FIELD OVERWRITE spec_version ON quote TYPE int ASSERT $value >= 1;
 DEFINE FIELD OVERWRITE terms ON quote TYPE string;
+-- Set when the client pays a deposit before work starts and the rest on delivery.
+DEFINE FIELD OVERWRITE deposit_micro ON quote TYPE option<int> ASSERT $value = NONE OR ($value > 0 AND $value < $this.amount_micro);
 DEFINE FIELD OVERWRITE created_at ON quote TYPE datetime VALUE time::now() READONLY;
 DEFINE INDEX OVERWRITE quote_version ON quote FIELDS project, version UNIQUE;
 DEFINE EVENT OVERWRITE append_only ON quote WHEN $event IN ["UPDATE", "DELETE"] THEN {
@@ -99,6 +101,8 @@ DEFINE FIELD OVERWRITE project ON payment_request TYPE record<project>;
 DEFINE FIELD OVERWRITE quote_version ON payment_request TYPE int ASSERT $value >= 1;
 DEFINE FIELD OVERWRITE amount_micro ON payment_request TYPE int ASSERT $value > 0;
 DEFINE FIELD OVERWRITE reference ON payment_request TYPE string;
+-- What it asks for: the whole price, a deposit, or the balance after a deposit (none means the whole price).
+DEFINE FIELD OVERWRITE part ON payment_request TYPE option<string> ASSERT $value = NONE OR $value IN ["full", "deposit", "balance"];
 DEFINE FIELD OVERWRITE status ON payment_request TYPE string ASSERT $value IN ["open", "paid", "expired"];
 DEFINE FIELD OVERWRITE created_at ON payment_request TYPE datetime DEFAULT time::now() READONLY;
 DEFINE FIELD OVERWRITE updated_at ON payment_request TYPE datetime VALUE time::now();

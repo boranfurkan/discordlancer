@@ -9,16 +9,20 @@ import { explorerUrl, solanaPayUrl, verifyPayment } from '../../domain/payment.j
 import { newReference, qrPng } from '../../services/solana.js';
 import { requireProject, UserError, type Command } from '../command.js';
 import { OWNER_NAME } from '../guards.js';
-import { settlePayment } from '../payments.js';
+import { dueNow, settlePayment } from '../payments.js';
+import { PART_LABEL } from '../../domain/deposit.js';
 
-const payDescription = 'Get the Solana Pay QR code for the accepted quote';
+const payDescription = 'Get the Solana Pay QR code for what is due on the accepted quote';
+
+/** Paying works once the quote is accepted, and while work is under way for a balance after a deposit. */
+const PAY_STAGES = ['quote_accepted', 'paid', 'in_development'] as const;
 
 export const pay: Command = {
   name: 'pay',
   description: payDescription,
   access: 'everyone',
   where: 'project',
-  stages: ['quote_accepted'],
+  stages: PAY_STAGES,
   definition: new SlashCommandBuilder().setName('pay').setDescription(payDescription).toJSON(),
 
   async execute(run) {
@@ -27,29 +31,33 @@ export const pay: Command = {
     if (!project.client_wallet) throw new UserError('First declare the wallet you will pay from with /set-payment-wallet.');
     const current = await latestQuote(ctx.db, project);
     if (!current) throw new UserError('There is no accepted quote to pay.');
+    const due = await dueNow(ctx, project);
+    if (!due) throw new UserError('Nothing is due: this project is paid in full. /receipt shows the payments.');
     await interaction.deferReply();
 
     const request =
-      (await openRequest(ctx.db, project, current.version)) ??
+      (await openRequest(ctx.db, project, current.version, due.part)) ??
       (await createRequest(
         ctx.db,
         project,
-        { quoteVersion: current.version, amountMicro: current.amount_micro, reference: await newReference() },
+        { quoteVersion: current.version, amountMicro: due.amountMicro, reference: await newReference(), part: due.part },
         { actor, actorId: interaction.user.id, action: 'payment.requested', outcome: 'ok' },
       ));
 
     const amount = formatUsdc(request.amount_micro);
+    const what = request.part === 'full' ? `quote v${request.quote_version}` : `${request.part} for quote v${request.quote_version}`;
     const url = solanaPayUrl({
       recipient: ctx.env.SOLANA_WALLET_ADDRESS,
       amountMicro: request.amount_micro,
       reference: request.reference,
       label: 'Discordlancer',
-      message: `${project.name} quote v${request.quote_version}`,
+      message: `${project.name} ${what}`,
     });
-    const qr = new AttachmentBuilder(await qrPng(url), { name: `pay-${project.name}-v${request.quote_version}.png` });
+    const qr = new AttachmentBuilder(await qrPng(url), { name: `pay-${project.name}-v${request.quote_version}${request.part === 'full' ? '' : `-${request.part}`}.png` });
     await interaction.editReply({
       content: [
-        `**Pay quote v${request.quote_version}: ${amount} USDC on Solana**`,
+        request.part === 'full' ? `**Pay quote v${request.quote_version}: ${amount} USDC on Solana**` : `**Pay ${PART_LABEL[request.part]} for quote v${request.quote_version}: ${amount} USDC on Solana**`,
+        request.part === 'deposit' ? `The rest, ${formatUsdc(current.amount_micro - request.amount_micro)} USDC, is due on delivery.` : '',
         'Scan the QR code with a Solana wallet app such as Phantom or Solflare. It fills in the amount, the token and a reference, so the bot finds your payment by itself.',
         `- Pay from your declared wallet: \`${project.client_wallet}\``,
         `- To: \`${ctx.env.SOLANA_WALLET_ADDRESS}\``,
@@ -58,7 +66,10 @@ export const pay: Command = {
         `Paying without the QR code? Send exactly ${amount} USDC from your declared wallet to the address above, then run **/paid** with the transaction signature.`,
         '',
         `Payment link: \`${url}\``,
-      ].join('\n'),
+      ]
+        // The second line is the deposit note, empty when there is none.
+        .filter((line, index) => !(index === 1 && line === ''))
+        .join('\n'),
       files: [qr],
     });
   },
@@ -71,7 +82,7 @@ export const paid: Command = {
   description: paidDescription,
   access: 'everyone',
   where: 'project',
-  stages: ['quote_accepted'],
+  stages: PAY_STAGES,
   definition: new SlashCommandBuilder()
     .setName('paid')
     .setDescription(paidDescription)
@@ -87,9 +98,11 @@ export const paid: Command = {
     if (await paymentBySignature(ctx.db, signature)) throw new UserError('That payment is already recorded.');
     const current = await latestQuote(ctx.db, project);
     if (!current) throw new UserError('There is no accepted quote to pay.');
+    const due = await dueNow(ctx, project);
+    if (!due) throw new UserError('Nothing is due: this project is paid in full. /receipt shows the payments.');
     await interaction.deferReply();
 
-    const request = await openRequest(ctx.db, project, current.version);
+    const request = await openRequest(ctx.db, project, current.version, due.part);
     let tx: unknown;
     try {
       tx = await ctx.solana.transaction(signature);
@@ -102,7 +115,7 @@ export const paid: Command = {
       signature,
       recipient: ctx.env.SOLANA_WALLET_ADDRESS,
       sender: project.client_wallet,
-      minAmountMicro: request?.amount_micro ?? current.amount_micro,
+      minAmountMicro: request?.amount_micro ?? due.amountMicro,
     });
     if (!verdict.ok) throw new UserError(`That transaction doesn't count as this payment: ${verdict.reason}.`);
 

@@ -251,6 +251,8 @@ Skills: the `tessl__*` skills, `gemini-api-dev`, `surrealdb-agent-memory-docs`.
 - [ ] **Live check after deploying:** in a test channel, post a PDF, a screenshot, a voice note and a link; check 👀/✅, the 📎 Files thread, and a reply under a `.fig` file.
 - [x] Preview links: open pull requests' previews (Vercel, Netlify, Cloudflare Pages) posted in 🔧, held back while behind a sign-in. See `PLAN.md`, Preview links.
 - [ ] **Boran, per project on Vercel:** import the repo once, and turn off Vercel Authentication (Settings → Deployment Protection) so the client can open previews.
+- [x] Deposits: `/quote … deposit:<percent>`; `/pay` asks for the deposit, then the balance; the balance is due before the client confirms delivery; `/invoice` re-issues after each payment. See `PLAN.md`, Payment.
+- [ ] **Live check after deploying:** a tiny deposit quote on a test project (for example 0.02 USDC, 50%), paid in two parts from a second wallet.
 - [x] `/review-repo` for an existing codebase (GitHub link or zip): reference notes, a pull request adding `docs/references/<name>.md`, and the notes in specs, `/ask`, docs and the brief. See `PLAN.md`, Reviewing an existing codebase. Real check on a public repo.
 
 ### Phase 11: Client teams and threads (added 10 Nov)

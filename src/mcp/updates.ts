@@ -161,7 +161,7 @@ export function renderBrief(input: BriefInput): string {
     `- Client: ${clientMembers(project).length ? `${clientMembers(project).length} ${clientMembers(project).length === 1 ? 'person' : 'people'} in the channel` : 'not joined yet'}`,
     `- Repo: https://github.com/${project.repo}`,
     quote
-      ? `- Quote v${quote.quote.version}: ${formatUsdc(quote.quote.amount_micro)} USDC for spec v${quote.quote.spec_version}, delivery by ${formatDeadline(quote.quote.deadline)}; ${agreement(quote.agreedBy)}.`
+      ? `- Quote v${quote.quote.version}: ${formatUsdc(quote.quote.amount_micro)} USDC${quote.quote.deposit_micro ? ` (a ${formatUsdc(quote.quote.deposit_micro)} USDC deposit before work starts, the rest on delivery)` : ''} for spec v${quote.quote.spec_version}, delivery by ${formatDeadline(quote.quote.deadline)}; ${agreement(quote.agreedBy)}.`
       : '- Quote: none yet.',
     payments.length
       ? `- Payments: ${payments.map((payment) => `${formatUsdc(payment.amount_micro)} USDC on ${payment.verified_at.toISOString().slice(0, 10)}`).join('; ')}.`

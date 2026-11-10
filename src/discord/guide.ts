@@ -94,7 +94,7 @@ export const GUIDE: Record<string, GuideEntry> = {
   quote: {
     phase: 'deal',
     owner:
-      'Posts a fixed price in USDC for the agreed spec, with a delivery deadline (London time). Posting it counts as your acceptance. A deadline after the hackathon freeze gets a private warning.',
+      'Posts a fixed price in USDC for the agreed spec, with a delivery deadline (London time). Posting it counts as your acceptance. Optional `deposit` (10 to 90%): the client pays that first and work starts; the rest is due on delivery, before they can confirm it, and `/invoice` then issues an updated invoice. A deadline after the hackathon freeze gets a private warning.',
   },
   'accept-quote': {
     phase: 'deal',
@@ -108,9 +108,9 @@ export const GUIDE: Record<string, GuideEntry> = {
   },
   pay: {
     phase: 'payment',
-    owner: 'A Solana Pay QR code and link for the accepted quote, with a unique reference. The bot watches the chain and confirms the payment by itself.',
+    owner: 'A Solana Pay QR code and link for what is due on the accepted quote (the whole price, the deposit, or later the balance), with a unique reference. The bot watches the chain and confirms the payment by itself.',
     client:
-      'Shows a QR code and link for the accepted quote. Scan it with a Solana wallet such as Phantom or Solflare and approve the USDC payment (you also need a little SOL for the network fee). The bot sees it on the blockchain within a minute and confirms it in your channel.',
+      'Shows a QR code and link for what is due: the whole price, or the deposit first and the rest on delivery if your quote has one. Scan it with a Solana wallet such as Phantom or Solflare and approve the USDC payment (you also need a little SOL for the network fee). The bot sees it on the blockchain within a minute and confirms it in your channel.',
   },
   paid: {
     phase: 'payment',
@@ -316,7 +316,7 @@ export function clientGuide(commands: readonly Listed[]): APIEmbed[] {
     },
     ...phaseEmbed('anytime', '💬 Any time'),
     ...phaseEmbed('deal', '📝 Specs and quote', `${OWNER_NAME} writes the spec and posts the quote; you agree to each.`),
-    ...phaseEmbed('payment', '💸 Paying', 'Payment is in USDC on Solana, in full before work starts, as the quote says.'),
+    ...phaseEmbed('payment', '💸 Paying', 'Payment is in USDC on Solana, as the quote says: in full before work starts, or a deposit first and the rest on delivery, before you confirm it.'),
     ...phaseEmbed('build', '🔨 While it is built'),
     ...phaseEmbed('delivery', '✅ Delivery and changes'),
     {

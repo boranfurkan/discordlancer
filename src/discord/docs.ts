@@ -80,7 +80,7 @@ export function renderSources(sources: DocsSources): string {
     `Stage: ${STAGE_LABEL[project.stage]}`,
     `Started: ${day(project.created_at)}`,
     quote
-      ? `Latest quote: v${quote.quote.version}, ${formatUsdc(quote.quote.amount_micro)} USDC for spec v${quote.quote.spec_version}, delivery by ${formatDeadline(quote.quote.deadline)}; ${agreement(quote.agreedBy)}.`
+      ? `Latest quote: v${quote.quote.version}, ${formatUsdc(quote.quote.amount_micro)} USDC${quote.quote.deposit_micro ? ` (a ${formatUsdc(quote.quote.deposit_micro)} USDC deposit before work starts, the rest on delivery)` : ''} for spec v${quote.quote.spec_version}, delivery by ${formatDeadline(quote.quote.deadline)}; ${agreement(quote.agreedBy)}.`
       : 'Quote: none yet.',
     payments.length ? `Payments: ${payments.map((payment) => `${formatUsdc(payment.amount_micro)} USDC on ${day(payment.verified_at)}`).join('; ')}.` : 'Payments: none yet.',
     project.delivery_marked_at ? `Marked delivered: ${day(project.delivery_marked_at)}.` : '',

@@ -40,7 +40,9 @@ export function startPaymentWatcher(client: Client, ctx: BotContext, intervalMs 
 
 export async function checkRequest(client: Client, ctx: BotContext, request: PaymentRequest, judged: Set<string>): Promise<void> {
   const project = await getProject(ctx.db, request.project);
-  if (!project || project.stage !== 'quote_accepted' || !project.client_wallet) return;
+  // A deposit or the whole price is paid after the quote is accepted; a balance while the work is under way.
+  const stages = request.part === 'balance' ? ['paid', 'in_development'] : ['quote_accepted'];
+  if (!project || !stages.includes(project.stage) || !project.client_wallet) return;
   const guild = client.guilds.cache.get(ctx.env.DISCORD_GUILD_ID);
   if (!guild) return;
 

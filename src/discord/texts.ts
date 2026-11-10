@@ -21,7 +21,7 @@ export const NEXT_STEP: Record<Stage, string> = {
   created: `${OWNER_NAME} sends the invite link to the client.`,
   joined: `Describe what you need here, with screenshots if they help. ${OWNER_NAME} then writes the specs with /create-specs.`,
   specs_agreed: `${OWNER_NAME} posts a quote with /quote.`,
-  quote_accepted: 'The client declares their wallet with /set-payment-wallet, then pays with /pay.',
+  quote_accepted: 'The client declares their wallet with /set-payment-wallet, then pays with /pay (the deposit, if the quote has one).',
   paid: `${OWNER_NAME} starts building with /start-development.`,
   in_development: `Building. When it's ready, ${OWNER_NAME} marks it delivered with /confirm-delivery and the client confirms.`,
   delivered: 'Delivered. Small changes can be asked for with /request-update.',
@@ -64,12 +64,14 @@ export function welcomeText(clientId: string, guideId?: string): string {
 }
 
 /** The default quote terms. Boran should review these; they are a business decision. */
-export function quoteTerms(specVersion: number, amount: string, deadline: string): string[] {
+export function quoteTerms(specVersion: number, amount: string, deadline: string, deposit?: { deposit: string; balance: string }): string[] {
   return [
     `Scope: what spec v${specVersion} describes. Anything beyond it needs a new quote.`,
-    `Price: ${amount} USDC, paid in full on Solana before work starts.`,
+    deposit
+      ? `Price: ${amount} USDC on Solana: a ${deposit.deposit} USDC deposit before work starts, and the remaining ${deposit.balance} USDC when the work is delivered, before you confirm the delivery.`
+      : `Price: ${amount} USDC, paid in full on Solana before work starts.`,
     `Delivery: by ${deadline}, in a GitHub repo you have access to.`,
-    'Ownership: the code is yours once the payment is confirmed.',
+    deposit ? 'Ownership: the code is yours once the full price is paid.' : 'Ownership: the code is yours once the payment is confirmed.',
     "Fixes: anything that doesn't match the agreed spec is fixed at no extra cost. New features need a new quote.",
   ];
 }

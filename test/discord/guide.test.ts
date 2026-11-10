@@ -35,7 +35,7 @@ describe('guides', () => {
   it('the owner guide shows every command, how to type it, and marks yours', () => {
     const names = fieldNames(ownerGuide(COMMANDS));
     for (const command of COMMANDS) expect(names.some((name) => name.includes(`/${command.name}`)), command.name).toBe(true);
-    expect(names).toContain('🔒 /quote amount deadline');
+    expect(names).toContain('🔒 /quote amount deadline [deposit]');
     expect(names).toContain('🔒 /call start | stop | retry');
     expect(names).toContain('🔒 /new-project name  ·  anywhere');
     expect(names).toContain('/ask question');
