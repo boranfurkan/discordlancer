@@ -37,7 +37,7 @@ async function readGithub(ctx: Parameters<Command['execute']>[0]['ctx'], input: 
     const status = githubStatus(error);
     if (status === 404) {
       throw new UserError(
-        `I can't see \`${label}\`${ref.branch ? ` (branch \`${ref.branch}\`)` : ''}. If it's private, the bot's GitHub token has no access to it: ask for a zip of the code and run this again with \`zip\`. The bot never needs the client's GitHub password.`,
+        `I can't see \`${label}\`${ref.branch ? ` (branch \`${ref.branch}\`)` : ''}. If it's private, ask its owner to add **${ctx.env.GITHUB_OWNER}** on GitHub as a collaborator (read access is enough), or ask for a zip of the code and run this again with \`zip\`. Never ask for their GitHub password.`,
       );
     }
     if (status === 403 || status === 429) throw new UserError('GitHub refused or limited the request just now. Try again in a few minutes.');

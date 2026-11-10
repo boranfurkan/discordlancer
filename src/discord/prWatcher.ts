@@ -10,11 +10,16 @@ import { projectScope, safeRemember } from '../services/memory.js';
 import { ensureOwnerChannel, ensureProjectThread } from './channels.js';
 import type { BotContext } from './command.js';
 import { OWNER_NAME } from './guards.js';
+import { createPreviewWatch } from './previews.js';
 
 export const PR_WATCH_INTERVAL_MS = 60_000;
+/** Previews are looked for every fifth tick: about every 5 minutes. */
+const PREVIEW_EVERY = 5;
 
 export function startPullRequestWatcher(client: Client, ctx: BotContext, intervalMs = PR_WATCH_INTERVAL_MS): () => void {
   let running = false;
+  let ticks = 0;
+  const previews = createPreviewWatch(ctx);
   const tick = async () => {
     if (running) return;
     running = true;
@@ -24,6 +29,7 @@ export function startPullRequestWatcher(client: Client, ctx: BotContext, interva
         for (const request of await listChangeRequestsByStatus(ctx.db, ['issue_opened', 'pr_open'])) {
           await checkChangeRequest(guild, ctx, request);
         }
+        if (ticks++ % PREVIEW_EVERY === 0) await previews.check(guild);
       }
     } catch (error) {
       log.warn('pull request watch failed', { error });

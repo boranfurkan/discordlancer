@@ -315,11 +315,19 @@ Everything posted in a project channel (or its threads) by a person is read once
 - **Notes feed** `/create-specs` and `/sync-docs` (as `<files>`; images are still sent to them as pictures too), `/ask`, Claude Code's brief (newest first, about 24,000 characters), and `docs/project/files.md`. Docs cite a file as `[file roadmap.pdf, 2026-11-11 12:40]`, optionally with a place (`, p. 4`), and the citation check knows every file.
 - **Tested 10 Nov** with the real Gemini: a PDF (6 s), a Word file (4 s) and observv.com through the safe fetcher (10 s), each with sensible notes.
 
+## Preview links
+
+When a project's repo is connected to a host that builds pull requests (Vercel, Netlify, Cloudflare Pages), the host reports each preview's address to GitHub. Every 5 minutes (`src/discord/previews.ts`, run by the pull request watcher) the bot looks at the open pull requests of projects that are paid, in development, delivered or in support (not its own `discordlancer/` branches): the newest successful non-production deployment's `environment_url`, or a successful commit status naming a preview (Netlify). No host keys are needed; the classic `repo` token covers it.
+
+- **Posted** in 🔧 Code changes, marked as a live preview that may use test data, with a `preview.posted` event. A newer build of the same pull request is posted again at most every 2 hours; what was posted is read back from the event log after a restart.
+- **Checked first** as a signed-out visitor (through the safe link fetcher): Vercel protects previews with a sign-in by default (seen 10 Nov on Boran's own projects: a 302 to `vercel.com/sso-api`). A preview behind a sign-in is held back and Boran is told once in `#owner-desk` how to open it (Settings → Deployment Protection → Vercel Authentication off); it's posted once it opens.
+- **Checked 10 Nov** against real Vercel deployment records on one of Boran's repos: `Preview` deployments carry the address in their success status, as expected.
+
 ## Reviewing an existing codebase
 
 Most projects start from scratch, but a client may have a current app, or point at one they like. `/review-repo about [repo] [zip]` (owner) reads it and writes reference notes for the new project (`src/discord/references.ts`).
 
-- **Sources:** a GitHub link or `owner/name` (public, or one the bot's token can see; a `/tree/<branch>` link reads that branch), or a `.zip` of the code for a private repo, so nobody shares a GitHub login. The project's own repo is refused (`/sync-docs` covers it).
+- **Sources:** a GitHub link or `owner/name` (public, or private once its owner adds `boranfurkan` as a collaborator, since the classic token reads every repo Boran can; a `/tree/<branch>` link reads that branch), or a `.zip` of the code, so nobody shares a GitHub login. The project's own repo is refused (`/sync-docs` covers it).
 - **Reading:** up to 160 files and 900 KB, best first: the README, manifests and config, docs, schemas and types, API code, the rest of the code, tests last. Six files at a time from GitHub. A zip is read with our own zip reader, without its top folder, `node_modules` or macOS extras.
 - **Review:** Gemini (`repo-review-v1`, medium thinking) gets the new project's latest spec and shared-file notes, Boran's note, the file list and the files read, and writes notes: what it is, stack, structure, data model, APIs and integrations, how to run it, what the new project can reuse, gaps and risks, questions for the client. Secrets are named by file, never copied. Saved as an append-only `repo_review` with a `repo.reviewed` event.
 - **Then:** a summary in the channel (marked as an AI review), and a pull request on `discordlancer/reference-<name>` adding `docs/references/<name>.md` to the project's repo (not committed if the notes look like they hold a key). Specs, `/ask`, `/sync-docs` (citations like `[repo acme/old-app]`) and Claude Code's brief use the notes as context, never as requirements.

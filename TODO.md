@@ -249,6 +249,8 @@ Skills: the `tessl__*` skills, `gemini-api-dev`, `surrealdb-agent-memory-docs`.
 - [x] Shared files and links read once when posted, into append-only `file_note`s; 📎 Files thread; `/read-files`; notes feed specs, `/ask`, docs (`files.md`) and Claude Code's brief. See `PLAN.md`, Shared files and links.
 - [x] Real check: a PDF, a Word file and observv.com read by the real Gemini.
 - [ ] **Live check after deploying:** in a test channel, post a PDF, a screenshot, a voice note and a link; check 👀/✅, the 📎 Files thread, and a reply under a `.fig` file.
+- [x] Preview links: open pull requests' previews (Vercel, Netlify, Cloudflare Pages) posted in 🔧, held back while behind a sign-in. See `PLAN.md`, Preview links.
+- [ ] **Boran, per project on Vercel:** import the repo once, and turn off Vercel Authentication (Settings → Deployment Protection) so the client can open previews.
 - [x] `/review-repo` for an existing codebase (GitHub link or zip): reference notes, a pull request adding `docs/references/<name>.md`, and the notes in specs, `/ask`, docs and the brief. See `PLAN.md`, Reviewing an existing codebase. Real check on a public repo.
 
 ### Phase 11: Client teams and threads (added 10 Nov)

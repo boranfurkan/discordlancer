@@ -89,8 +89,44 @@ export interface GitHubApi {
    * reset to it). Only files that differ are written; with none, nothing is committed.
    */
   commitToBranch(repo: string, branch: string, files: ReadonlyArray<RepoFile>, message: string): Promise<CommitResult>;
+  /** The open pull requests (not the bot's own) that have a live preview. */
+  previewsFor(repo: string): Promise<PullPreview[]>;
   /** Opens a pull request from `branch` into the default branch, or updates the open one. */
   upsertPull(repo: string, branch: string, title: string, body: string): Promise<{ number: number; url: string; created: boolean }>;
+}
+
+/** A live preview of an open pull request, from the host that built it (Vercel, Netlify, Cloudflare Pages…). */
+export interface PullPreview {
+  number: number;
+  title: string;
+  pullUrl: string;
+  branch: string;
+  sha: string;
+  url: string;
+  /** The deployment's environment name, such as "Preview". */
+  environment: string;
+}
+
+interface RawStatus {
+  state: string;
+  context?: string;
+  target_url?: string | null;
+  environment_url?: string;
+  created_at?: string;
+}
+
+/**
+ * Pure: the preview address for a commit: the newest successful deployment's address,
+ * or else a successful commit status that names a preview (how Netlify reports one).
+ */
+export function previewFrom(deployments: ReadonlyArray<{ environment: string; statuses: readonly RawStatus[] }>, statuses: readonly RawStatus[]): { url: string; environment: string } | undefined {
+  for (const deployment of deployments) {
+    if (/^production/i.test(deployment.environment)) continue;
+    const success = deployment.statuses.find((status) => status.state === 'success' && status.environment_url);
+    if (success?.environment_url && /^https:\/\//.test(success.environment_url)) return { url: success.environment_url, environment: deployment.environment };
+  }
+  const status = statuses.find((item) => item.state === 'success' && /preview/i.test(item.context ?? '') && /^https:\/\//.test(item.target_url ?? '') && !/github\.com|vercel\.com\/[^/]+\/[^/]+\/[A-Za-z0-9]+$/.test(item.target_url ?? ''));
+  return status?.target_url ? { url: status.target_url, environment: status.context ?? 'Preview' } : undefined;
 }
 
 export interface RepoFile {
@@ -355,6 +391,30 @@ export function createGitHub(
       const { data: info } = await octokit.rest.repos.get({ ...where, ...signal() });
       const { data } = await octokit.rest.pulls.create({ ...where, title, body, head: branch, base: info.default_branch, ...signal() });
       return { number: data.number, url: data.html_url, created: true };
+    },
+
+    async previewsFor(repo) {
+      const [repoOwner, repoName] = repo.split('/');
+      if (!repoOwner || !repoName) throw new GitHubError(`Bad repo name ${repo}`);
+      const where = { owner: repoOwner, repo: repoName };
+      const { data: pulls } = await octokit.rest.pulls.list({ ...where, state: 'open', per_page: 20, ...signal() });
+      const previews: PullPreview[] = [];
+      for (const pull of pulls) {
+        if (pull.head.ref.startsWith(BOT_BRANCH_PREFIX)) continue;
+        const { data: deployments } = await octokit.rest.repos.listDeployments({ ...where, sha: pull.head.sha, per_page: 5, ...signal() });
+        const withStatuses = [];
+        for (const deployment of deployments) {
+          const { data: statuses } = await octokit.rest.repos.listDeploymentStatuses({ ...where, deployment_id: deployment.id, per_page: 5, ...signal() });
+          withStatuses.push({ environment: deployment.environment, statuses });
+        }
+        let statuses: RawStatus[] = [];
+        if (!withStatuses.some((deployment) => deployment.statuses.some((status) => status.state === 'success'))) {
+          statuses = (await octokit.rest.repos.getCombinedStatusForRef({ ...where, ref: pull.head.sha, ...signal() })).data.statuses;
+        }
+        const found = previewFrom(withStatuses, statuses);
+        if (found) previews.push({ number: pull.number, title: pull.title, pullUrl: pull.html_url, branch: pull.head.ref, sha: pull.head.sha, ...found });
+      }
+      return previews;
     },
 
     async getPull(repo, number) {

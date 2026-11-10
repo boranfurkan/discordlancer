@@ -248,6 +248,10 @@ export function ownerGuide(commands: readonly Listed[]): APIEmbed[] {
           'Files and links',
           'Everything posted in a project channel or its threads is read once (👀, then ✅): PDFs, Word, Excel and PowerPoint files, screenshots, voice notes (ElevenLabs), short videos, zips, public web pages and public Google Docs. The notes go in the 📎 Files thread and into specs, `/ask`, `/sync-docs` (docs/project/files.md) and Claude Code\'s brief. Something unreadable (Figma, Loom, a private link) gets a reply saying what to send instead.',
         ),
+        field(
+          'Preview links',
+          "Connect a project's repo to Vercel (or Netlify, Cloudflare Pages) once. Every 5 minutes the bot looks for open pull requests with a preview and posts each new one in 🔧 for the client (a newer build of the same pull request at most every 2 hours). On Vercel, turn off **Vercel Authentication** under Settings → Deployment Protection: a preview behind a sign-in is held back, and you're told in #owner-desk.",
+        ),
         field('Buttons', "**Approve** / **Decline** on change requests (you only), **Confirm delivery** (client side), **Record me** / **Don't record me** on calls (each person for themselves)."),
         field(
           'Threads in each project channel',

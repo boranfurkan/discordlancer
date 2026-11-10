@@ -85,6 +85,7 @@ const githubApi: GitHubApi = {
     return pull;
   },
   readFolder: async () => new Map(github.docs),
+  previewsFor: async () => [],
   commitToBranch: async (_repo, branch, files, message) => {
     const changed = files.filter((file) => github.docs.get(file.path) !== file.content);
     if (changed.length === 0) return { changed: false };
