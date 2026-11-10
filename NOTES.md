@@ -101,6 +101,7 @@ All from `efe_shipyard` in #support unless noted. These override the guide.
 - **A new client's project counts** if it starts after 2 Nov and is paid before the freeze, even when built with AI agents and logged touches. Payment has to be proven to get on the leaderboard.
 - **Reaching out to find clients yourself is allowed,** and it counts as a touch.
 - **Past clients don't count:** "the rules only count sales to new customers."
+- **Wallet declared (9 Nov, 20:15):** Boran told `efe_shipyard` and Shipyard Admin in the team channel that payments go to `FRgRdaRFEiPDe63WdfzJpZWHG1MYJqSZ8SD6i45jGpAG`, which is the bot's `SOLANA_WALLET_ADDRESS` (checked 10 Nov). **Shipyard Admin:** after a payment comes through, send an invoice in that channel; they confirm the payment before adding it to the leaderboard. Keep the invoice and everything else for the records.
 - **Referrals count (`efe_shipyard`, 9 Nov):** an existing client introducing a new client, with no cut, is a stranger sale, as long as the new client is new to us and pays us directly. Log the human parts as touches: the intro ask, calls, sales chats and build sessions. If paid in USDC, declare the wallet before the first payment. Keep the intro message for the audit.
 
 **Credits**
