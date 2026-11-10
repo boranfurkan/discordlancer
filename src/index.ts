@@ -12,6 +12,7 @@ import { onOwnerMention } from './discord/ownerAnswer.js';
 import { CONSENT_PREFIX, onCallConsent } from './discord/commands/call.js';
 import type { BotContext } from './discord/command.js';
 import { createCallManager } from './voice/calls.js';
+import { syncOwnerGuide } from './discord/guide.js';
 import { ensureProjectThread } from './discord/channels.js';
 import { clientMembers } from './db/projects.js';
 import { createElevenLabs } from './services/elevenlabs.js';
@@ -85,6 +86,9 @@ async function main(): Promise<void> {
     void safeRecord(ctx, { actor: 'bot', action: 'bot.started', outcome: 'ok' });
     stopWatcher = startPaymentWatcher(client, ctx);
     stopPullWatcher = startPullRequestWatcher(client, ctx);
+    void ready.guilds.fetch(env.DISCORD_GUILD_ID).then((guild) => syncOwnerGuide(guild, env.DISCORD_OWNER_ID, COMMANDS)).catch((error: unknown) => {
+      log.warn('could not reach the server for the owner guide', { error });
+    });
   });
   handleInteractions(client, ctx, {
     [CONFIRM_DELIVERY_BUTTON]: onConfirmDeliveryButton,

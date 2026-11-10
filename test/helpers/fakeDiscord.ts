@@ -54,6 +54,7 @@ export interface FakeMessage {
   reply(payload: unknown): Promise<FakeMessage>;
   /** discord.js: message.edit(payload); keeps the latest content and buttons. */
   edit(payload: unknown): Promise<FakeMessage>;
+  delete(): Promise<void>;
   customIds: string[];
 }
 
@@ -151,6 +152,9 @@ export class FakeChannel {
         return channel.post({ id: channel.guild.botId, bot: true, name: 'Freelance Manager Bot' }, reply.content, reply.files, id);
       },
       customIds: [],
+      async delete() {
+        channel.history.splice(channel.history.indexOf(message), 1);
+      },
       async edit(payload: unknown) {
         const update = toReply('update', payload);
         message.content = update.content || message.content;

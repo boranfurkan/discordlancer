@@ -258,6 +258,10 @@ While Boran builds a client's app with Claude Code, the session can tell the cli
 - **Boran sees every update before it goes out:** Claude Code asks permission for `post_update` and shows the text. Keep it that way rather than allowing it always.
 - **Touches:** the build session is one touch. Updates posted during it don't add more; `/touches` describes them as part of the build session.
 
+## Owner guide
+
+`#owner-guide`, next to `#owner-desk` and just as private, explains how a project runs, every command (yours, and the ones the client team can use), what works without commands, and the laptop steps. It's built from the bot's own command list (`src/discord/guide.ts`) and refreshed each time the bot connects: messages are edited in place, never reposted. A test fails if a command has no guide entry, so a new command can't go undocumented.
+
 ## Threads in each project channel
 
 So the main channel stays a conversation, the bot posts three kinds of thing in public threads under it, made the first time they're needed (`ensureProjectThread` in `src/discord/channels.ts`):

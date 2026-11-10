@@ -93,6 +93,13 @@ export function ensureProjectChannel(guild: Guild, name: string, ownerId: string
   return ensurePrivateText(guild, name, ownerId, `Discordlancer project: ${name}`);
 }
 
+/** Boran's private guide to every command (see guide.ts). */
+export const GUIDE_CHANNEL = 'owner-guide';
+
+export function ensureGuideChannel(guild: Guild, ownerId: string): Promise<TextChannel> {
+  return ensurePrivateText(guild, GUIDE_CHANNEL, ownerId, 'How to use Discordlancer: every command and how a project runs. Only you can see this.');
+}
+
 /** A channel only Boran and the bot can see: notices, ambiguous joins, evidence exports. */
 export function ensureOwnerChannel(guild: Guild, ownerId: string): Promise<TextChannel> {
   return ensurePrivateText(guild, OWNER_CHANNEL, ownerId, 'Discordlancer notices for the owner only');
