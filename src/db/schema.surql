@@ -17,6 +17,8 @@ DEFINE FIELD OVERWRITE client_github ON project TYPE option<string>;
 DEFINE FIELD OVERWRITE client_wallet ON project TYPE option<string>;
 DEFINE FIELD OVERWRITE delivery_marked_at ON project TYPE option<datetime>;
 DEFINE FIELD OVERWRITE delivery_note ON project TYPE option<string>;
+-- SHA-256 of the key Boran's Claude Code session uses to post progress updates (never the key).
+DEFINE FIELD OVERWRITE dev_key_hash ON project TYPE option<string>;
 DEFINE FIELD OVERWRITE stage ON project TYPE string ASSERT $value IN [
   "created", "joined", "specs_agreed", "quote_accepted", "paid",
   "in_development", "delivered", "support", "cancelled", "archived"
@@ -25,6 +27,7 @@ DEFINE FIELD OVERWRITE created_at ON project TYPE datetime DEFAULT time::now() R
 DEFINE FIELD OVERWRITE updated_at ON project TYPE datetime VALUE time::now();
 DEFINE INDEX OVERWRITE project_name ON project FIELDS name UNIQUE;
 DEFINE INDEX OVERWRITE project_channel ON project FIELDS channel_id UNIQUE;
+DEFINE INDEX OVERWRITE project_dev_key ON project FIELDS dev_key_hash;
 
 -- Event log (append-only) ---------------------------------------------------
 

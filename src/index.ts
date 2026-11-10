@@ -1,6 +1,6 @@
 // Starts Discordlancer: env, database and schema, commands, then the Discord client.
 
-import { Events } from 'discord.js';
+import { ChannelType, Events } from 'discord.js';
 import { closeDatabase, connectDatabase } from './db/client.js';
 import { applySchema } from './db/migrate.js';
 import { createDiscordClient, handleInteractions, safeRecord } from './discord/client.js';
@@ -17,7 +17,8 @@ import { startPaymentWatcher } from './discord/watcher.js';
 import { startPullRequestWatcher } from './discord/prWatcher.js';
 import { registerCommands } from './discord/register.js';
 import { loadEnv, secretValues } from './env.js';
-import { healthPort, startHealthServer } from './health.js';
+import { healthPort, startHealthServer, type RouteHandler } from './health.js';
+import { createMcpHandler, MCP_PATH } from './mcp/server.js';
 import { log, registerSecrets } from './log.js';
 
 process.on('unhandledRejection', (reason) => {
@@ -35,7 +36,8 @@ async function main(): Promise<void> {
 
   // Opened first, so the host sees the app is up while the rest starts.
   const client = createDiscordClient();
-  const health = startHealthServer(healthPort(process.env.PORT), () => client.isReady());
+  let mcp: RouteHandler | undefined;
+  const health = startHealthServer(healthPort(process.env.PORT), () => client.isReady(), { [MCP_PATH]: () => mcp });
 
   const db = await connectDatabase(env);
   await applySchema(db);
@@ -52,6 +54,21 @@ async function main(): Promise<void> {
     memory: createMemory(env),
     commands: COMMANDS,
   };
+
+  // Claude Code's progress updates: posted in the project's channel, pinging nobody.
+  mcp = createMcpHandler({
+    db,
+    memory: ctx.memory,
+    ownerId: env.DISCORD_OWNER_ID,
+    async post(channelId, content) {
+      const channel = await client.channels.fetch(channelId);
+      if (channel?.type !== ChannelType.GuildText || channel.guildId !== env.DISCORD_GUILD_ID) {
+        throw new Error(`project channel ${channelId} not found`);
+      }
+      const message = await channel.send({ content, allowedMentions: { parse: [] } });
+      return { url: message.url };
+    },
+  });
 
   client.once(Events.ClientReady, (ready) => {
     log.info('discord ready', { user: ready.user.tag, guild: env.DISCORD_GUILD_ID });

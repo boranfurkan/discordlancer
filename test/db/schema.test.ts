@@ -156,3 +156,19 @@ describe('other history tables are append-only too', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('project dev key hash', () => {
+  it('is optional, and a string when set', async () => {
+    await db.query('CREATE project CONTENT $content', {
+      content: { name: 'keyed', channel_id: 'c-keyed', repo: 'owner/keyed', stage: 'paid', dev_key_hash: 'a'.repeat(64) },
+    });
+    const hash = await one<string>('SELECT VALUE dev_key_hash FROM project WHERE name = "keyed"');
+    expect(hash).toBe('a'.repeat(64));
+    expect(await one<unknown>('SELECT VALUE dev_key_hash FROM $id', { id: demo })).toBeUndefined();
+    await expect(
+      db.query('CREATE project CONTENT $content', {
+        content: { name: 'badkey', channel_id: 'c-badkey', repo: 'owner/x', stage: 'paid', dev_key_hash: 42 },
+      }),
+    ).rejects.toThrow();
+  });
+});

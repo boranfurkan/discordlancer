@@ -126,6 +126,8 @@ const PHRASES: Record<string, (project: string, data: Record<string, unknown>) =
   'development.started': (p) => `started building ${p}`,
   'delivery.marked': (p) => `marked ${p} delivered`,
   'question.answered': (p) => `had the AI assistant answer client questions on ${p}`,
+  'project.claude_connected': (p) => `connected my Claude Code session to ${p}`,
+  'dev.update_posted': (p) => `built ${p} with Claude Code, which posted progress updates for the client`,
   'project.cancelled': (p) => `cancelled ${p}`,
   'project.archived': (p) => `archived ${p}`,
 };

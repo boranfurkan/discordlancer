@@ -22,6 +22,7 @@ export const ProjectRow = z.object({
   client_wallet: z.string().optional(),
   delivery_marked_at: toDate.optional(),
   delivery_note: z.string().optional(),
+  dev_key_hash: z.string().optional(),
   stage: z.enum(STAGES),
   created_at: toDate,
   updated_at: toDate,
@@ -44,6 +45,12 @@ export async function getProjectByName(db: Surreal, name: string): Promise<Proje
 
 export async function getProjectByChannel(db: Surreal, channelId: string): Promise<Project | undefined> {
   const [rows] = await db.query<[unknown[]]>('SELECT * FROM project WHERE channel_id = $channelId LIMIT 1', { channelId });
+  return parseRows(rows)[0];
+}
+
+/** The project a Claude Code key belongs to, by the key's hash. */
+export async function getProjectByDevKeyHash(db: Surreal, hash: string): Promise<Project | undefined> {
+  const [rows] = await db.query<[unknown[]]>('SELECT * FROM project WHERE dev_key_hash = $hash LIMIT 1', { hash });
   return parseRows(rows)[0];
 }
 
@@ -102,6 +109,7 @@ export interface ProjectChanges {
   client_wallet?: string;
   delivery_marked_at?: Date;
   delivery_note?: string;
+  dev_key_hash?: string;
 }
 
 /**

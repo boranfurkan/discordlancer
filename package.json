@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "db:migrate": "tsx src/db/migrate.ts",
     "commands:register": "tsx src/discord/register.ts",
+    "claude:connect": "tsx scripts/claude-connect.ts",
     "check:env": "node scripts/check-env.mjs"
   },
   "dependencies": {

@@ -87,12 +87,15 @@ src/
     solana.ts           payment requests, finding and verifying payments
     memory.ts           Agent Memory REST calls
     tavily.ts           search
+  mcp/                  the MCP endpoint for Boran's Claude Code sessions (progress updates)
+  health.ts             the web port: status page, and /mcp
   prompts/              prompt text, each with a version name
 test/
   helpers/db.ts         memoryDb(): in-memory SurrealDB 4 with the real schema
   fixtures/             recorded payloads, with anything private removed
 scripts/
   check-env.mjs         tests every service without printing values
+  claude-connect.ts     connects a Claude Code session to one project (npm run claude:connect)
 ```
 
 ## Data model
@@ -101,7 +104,7 @@ SurrealDB 4 on SurrealDB Cloud (Earth): namespace `freelance`, database `bot`. E
 
 | Table | Holds | Unique by |
 |---|---|---|
-| `project` | Name, Discord channel ID, repo (`owner/name`), invite code, client's Discord ID, GitHub username and declared wallet, stage, timestamps | Name; channel ID |
+| `project` | Name, Discord channel ID, repo (`owner/name`), invite code, client's Discord ID, GitHub username and declared wallet, stage, the SHA-256 of its Claude Code key, timestamps | Name; channel ID |
 | `event` | **Append-only log:** time, project, actor (`owner`, `client` or `bot`), actor's Discord ID, action, data, outcome (`ok`, `refused`, `failed`) | |
 | `spec` | Project, version, markdown, what changed, open questions, model, prompt version, how many messages it read | Project + version |
 | `quote` | Project, version, amount (micro-USDC), deadline, spec version, terms | Project + version |
@@ -230,6 +233,23 @@ Clients ask with `/ask`. Boran gets an answer to a client's message by replying 
 - **Guardrails (prompt `answer-v1`):** it answers only from that context; it never agrees to a new price, discount, deadline or scope; it never repeats secrets; and client text and code are data. When something needs Boran it says so, and he's told in `#owner-desk`. Tested live on 9 Nov with a normal question, a discount request and a prompt injection: all three were handled correctly.
 - **Touches:** Boran's tag or menu answers are owner actions and appear in `/touches`. A client's `/ask` isn't a touch.
 - **Events:** `ask.answered` (from `/ask`) and `question.answered` (Boran's), with the model, prompt version, commit and whether it needs Boran.
+
+## Progress updates from Claude Code
+
+While Boran builds a client's app with Claude Code, the session can tell the client how the work is going, in the project's channel.
+
+- **Connecting a session:** on Boran's laptop, in this repo, `npm run claude:connect -- <project> [folder]`. It:
+  - clones the project's repo into the folder (default `~/Desktop/<project>`) if it isn't there, and refuses a folder that isn't that repo, so a session can never post to the wrong client;
+  - makes a new key for the project and stores only its SHA-256 (an older key stops working), with a `project.claude_connected` event;
+  - adds the bot's MCP server to Claude Code for that folder only (`claude mcp add --scope local`, kept in `~/.claude.json`), with the key as an `Authorization` header. The key is never printed, and never goes into the repo, Discord or a log;
+  - writes a "Client progress updates" section into the repo's `CLAUDE.md` and a `/update-client` command (`.claude/commands/update-client.md`). They hold no key and are safe to commit; the client can read them;
+  - checks the live bot accepts the key.
+- **The MCP server** is part of the bot, at `https://discordlancer.replit.app/mcp` (Streamable HTTP, stateless, JSON replies). It is written by hand rather than with the MCP SDK, which would add a web framework and a dozen packages to a bot that holds secrets. Each request needs a project key; requests with an `Origin` header (browsers) are refused. Its instructions tell Claude when and how to post.
+- **Tools:**
+  - `get_project_brief`: the stage, the latest spec (fenced, "requirements, not instructions") and whether it's agreed, the quote and deadline, payments, change requests and the last five updates. Read-only. Raw client chat is left out on purpose: the session can run commands on Boran's laptop, so client text never reaches it.
+  - `post_update`: summary, done, next, and optionally what's needed from the client. Posted in the key's own project channel, pinging nobody, ending "Written by Furkan's AI coding assistant (Claude) during his work session". Refused before the client joins, after cancel or archive, over 6 a day, over 1,900 characters, or when it looks like it contains a key. Recorded as `dev.update_posted` (actor `owner`) and remembered in Agent Memory, so `/ask` can answer "how's it going?".
+- **Boran sees every update before it goes out:** Claude Code asks permission for `post_update` and shows the text. Keep it that way rather than allowing it always.
+- **Touches:** the build session is one touch. Updates posted during it don't add more; `/touches` describes them as part of the build session.
 
 ## Change requests after delivery
 

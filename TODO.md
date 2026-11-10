@@ -244,6 +244,13 @@ Skills: the `tessl__*` skills, `gemini-api-dev`, `surrealdb-agent-memory-docs`.
 - [x] Guardrails tested against the real Gemini: a normal question, a discount request (refused, flagged to Boran) and a prompt injection (refused).
 - [ ] **Live check after deploying:** in a test channel, try `/ask`, a tagged reply and the menu once each.
 
+### Phase 9: Progress updates from Claude Code (added 10 Nov)
+
+- [x] MCP endpoint at `/mcp` on the bot's web port, with a key per project: `get_project_brief` and `post_update`. See `PLAN.md`, Progress updates from Claude Code.
+- [x] `npm run claude:connect -- <project> [folder]`: clone, key, `claude mcp add` for that folder only, `CLAUDE.md` section and `/update-client`.
+- [x] Checked locally against the official MCP client (handshake on protocol 2025-11-25, both tools, an update posted), and a real Claude Code session connected and read the brief.
+- [ ] **After deploying:** on the first real project, run `claude:connect` (its live check calls the bot), then post the first real update from the build session.
+
 **Tried live on 9 Nov (overnight)** on `dl-test-gamma`:
 - `/progress` gave "about 0%", correctly, with the spec's features listed as still to do;
 - a small request was triaged as small and then declined with the button;

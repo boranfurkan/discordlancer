@@ -38,11 +38,11 @@ export function welcomeText(clientId: string): string {
     `2. ${OWNER_NAME} turns the conversation into written specs with /create-specs, and you both agree them with /agree-specs.`,
     `3. ${OWNER_NAME} posts a quote with /quote, and you accept it with /accept-quote.`,
     '4. You pay in USDC on Solana with /pay. The bot checks the payment on chain by itself.',
-    `5. ${OWNER_NAME} builds and delivers, and you confirm the delivery.`,
+    `5. ${OWNER_NAME} builds and delivers, and you confirm the delivery. While he builds, progress updates appear here.`,
     '',
     `**Questions** about the project, at any stage: /ask. The AI assistant answers here from this chat, the specs and the code, and ${OWNER_NAME} follows up on anything it can't answer or that needs his decision.`,
     '',
-    `**Privacy:** the bot keeps a record of this project: the messages here (used to write the specs and answer questions), the commands you run, and payments. That gives you both a clear history. Specs, progress estimates and assistant answers are drafted with AI (Google Gemini) and marked as such; Gemini does not keep them.`,
+    `**Privacy:** the bot keeps a record of this project: the messages here (used to write the specs and answer questions), the commands you run, and payments. That gives you both a clear history. Specs, progress estimates and assistant answers are drafted with AI (Google Gemini) and marked as such; Gemini does not keep them. Progress updates are written by ${OWNER_NAME}'s AI coding assistant (Claude) while he works, and are marked as such too.`,
     '',
     'Type /help at any time to see what you can do.',
   ].join('\n');
