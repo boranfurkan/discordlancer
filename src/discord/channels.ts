@@ -10,6 +10,7 @@ import {
   type Invite,
   type OverwriteResolvable,
   type TextChannel,
+  type VoiceChannel,
 } from 'discord.js';
 
 export const PROJECTS_CATEGORY = 'Projects';
@@ -89,6 +90,43 @@ export function ensureProjectChannel(guild: Guild, name: string, ownerId: string
 /** A channel only Boran and the bot can see: notices, ambiguous joins, evidence exports. */
 export function ensureOwnerChannel(guild: Guild, ownerId: string): Promise<TextChannel> {
   return ensurePrivateText(guild, OWNER_CHANNEL, ownerId, 'Discordlancer notices for the owner only');
+}
+
+const VOICE_PERSON = [
+  PermissionFlagsBits.ViewChannel,
+  PermissionFlagsBits.Connect,
+  PermissionFlagsBits.Speak,
+  PermissionFlagsBits.UseVAD,
+  PermissionFlagsBits.Stream,
+];
+
+/**
+ * The project's private voice channel, named like its text channel: Boran, the bot
+ * and the client (once joined) can see it. Made the first time a call starts.
+ */
+export async function ensureProjectVoice(guild: Guild, name: string, ownerId: string, clientId?: string): Promise<VoiceChannel> {
+  const category = await ensureProjectsCategory(guild, ownerId);
+  const channels = await guild.channels.fetch();
+  let voice = channels.find(
+    (channel): channel is VoiceChannel => channel?.type === ChannelType.GuildVoice && channel.name === name && channel.parentId === category.id,
+  );
+  voice ??= await guild.channels.create({
+    name,
+    type: ChannelType.GuildVoice,
+    parent: category.id,
+    permissionOverwrites: [
+      { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+      { id: botId(guild), allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak] },
+      { id: ownerId, allow: VOICE_PERSON },
+    ],
+    reason: `Discordlancer: voice channel for ${name}`,
+  });
+  if (clientId && !voice.permissionOverwrites.cache.has(clientId)) {
+    await voice.permissionOverwrites.edit(clientId, Object.fromEntries(VOICE_PERSON.map((flag) => [permissionName(flag), true])), {
+      reason: 'Discordlancer: the client can join project calls',
+    });
+  }
+  return voice;
 }
 
 /** One use, seven days, always a new code, so each invite points at exactly one project. */

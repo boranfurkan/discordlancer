@@ -1,6 +1,8 @@
 // /create-specs and /agree-specs.
 
 import { AttachmentBuilder, ChannelType, SlashCommandBuilder } from 'discord.js';
+import { callsFor } from '../../db/calls.js';
+import { renderCalls } from '../../voice/callText.js';
 import { addAgreement, agreedParties, latestSpec, saveSpec, VersionTakenError } from '../../db/deals.js';
 import { moveStage } from '../../db/projects.js';
 import { log } from '../../log.js';
@@ -37,7 +39,8 @@ export const createSpecs: Command = {
     }
     const previous = await latestSpec(ctx.db, project);
     const memory = await safeRecall(ctx.memory, projectScope(project.name), 'Decisions, preferences and constraints agreed for this project');
-    const { input, plan } = await buildSpecInput(messages, previous, memory);
+    const calls = renderCalls(await callsFor(ctx.db, project));
+    const { input, plan } = await buildSpecInput(messages, previous, memory, calls);
 
     let output;
     try {

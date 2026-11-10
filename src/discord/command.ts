@@ -8,6 +8,7 @@ import type { GeminiApi } from '../services/gemini.js';
 import type { GitHubApi } from '../services/github.js';
 import type { MemoryApi } from '../services/memory.js';
 import type { SolanaApi } from '../services/solana.js';
+import type { CallManager } from '../voice/calls.js';
 
 export interface BotContext {
   env: Env;
@@ -17,6 +18,8 @@ export interface BotContext {
   solana: SolanaApi;
   memory: MemoryApi;
   commands: readonly Command[];
+  /** Recorded calls; absent in tests that don't use them. */
+  calls?: CallManager;
 }
 
 /** Who may run a command. Every command is visible to everyone. */

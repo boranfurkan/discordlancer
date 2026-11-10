@@ -9,6 +9,9 @@ import { APPROVE_PREFIX, DECLINE_PREFIX, onApproveChange, onDeclineChange } from
 import { CONFIRM_DELIVERY_BUTTON, onConfirmDeliveryButton } from './discord/commands/delivery.js';
 import { onMemberAdd } from './discord/joins.js';
 import { onOwnerMention } from './discord/ownerAnswer.js';
+import { CONSENT_PREFIX, onCallConsent } from './discord/commands/call.js';
+import type { BotContext } from './discord/command.js';
+import { createCallManager } from './voice/calls.js';
 import { createGemini } from './services/gemini.js';
 import { createGitHub } from './services/github.js';
 import { createMemory } from './services/memory.js';
@@ -45,7 +48,7 @@ async function main(): Promise<void> {
 
   let stopWatcher: (() => void) | undefined;
   let stopPullWatcher: (() => void) | undefined;
-  const ctx = {
+  const ctx: BotContext = {
     env,
     db,
     github: createGitHub(env),
@@ -54,6 +57,7 @@ async function main(): Promise<void> {
     memory: createMemory(env),
     commands: COMMANDS,
   };
+  ctx.calls = createCallManager(ctx);
 
   // Claude Code's progress updates: posted in the project's channel, pinging nobody.
   mcp = createMcpHandler({
@@ -80,6 +84,10 @@ async function main(): Promise<void> {
     [CONFIRM_DELIVERY_BUTTON]: onConfirmDeliveryButton,
     [APPROVE_PREFIX]: onApproveChange,
     [DECLINE_PREFIX]: onDeclineChange,
+    [CONSENT_PREFIX]: onCallConsent,
+  });
+  client.on(Events.VoiceStateUpdate, (oldState, newState) => {
+    ctx.calls?.onVoiceStateUpdate(oldState, newState);
   });
   client.on(Events.GuildMemberAdd, (member) => {
     void onMemberAdd(member, ctx);
@@ -92,6 +100,12 @@ async function main(): Promise<void> {
     log.info('shutting down', { signal });
     stopWatcher?.();
     stopPullWatcher?.();
+    // A call in progress is ended and transcribed if there's time; Replit allows a few seconds.
+    const active = ctx.calls?.activeProject();
+    if (active) {
+      await ctx.calls?.stop(active, 'the bot is restarting');
+      await Promise.race([ctx.calls?.idle(), new Promise((resolve) => setTimeout(resolve, 20_000))]);
+    }
     health.close();
     await client.destroy();
     await closeDatabase(db);

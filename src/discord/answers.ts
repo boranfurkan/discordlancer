@@ -4,6 +4,7 @@
 // Agent Memory, and the code on GitHub. Used by /ask and by Boran's "answer this".
 
 import type { Guild, TextChannel } from 'discord.js';
+import { callsFor, type Call } from '../db/calls.js';
 import { changeRequestsFor, type ChangeRequest } from '../db/changes.js';
 import { agreedParties, latestQuote, latestSpec, type Quote, type Spec } from '../db/deals.js';
 import { recordEvent, type Actor } from '../db/events.js';
@@ -19,6 +20,7 @@ import { projectScope, safeRecall } from '../services/memory.js';
 import { ensureOwnerChannel } from './channels.js';
 import { UserError, type BotContext } from './command.js';
 import { OWNER_NAME } from './guards.js';
+import { renderCalls } from '../voice/callText.js';
 import { fitMessage, STAGE_LABEL } from './texts.js';
 import { readConversation, renderConversation, type ChatMessage } from './transcript.js';
 
@@ -35,6 +37,7 @@ export interface AnswerContext {
   quote?: { quote: Quote; agreedBy: readonly string[] } | undefined;
   payments: readonly Payment[];
   changes: readonly ChangeRequest[];
+  calls?: readonly Call[];
   memory: string;
   messages: readonly ChatMessage[];
   code?: RepoSnapshot | undefined;
@@ -83,6 +86,7 @@ export function renderAnswerInput(context: AnswerContext): string {
       ? fence('change_requests', changes.map((change) => `- [${change.status}${change.pr_number ? `, pull request #${change.pr_number}` : ''}] ${change.text.slice(0, 300)}`).join('\n'))
       : '',
     context.memory ? fence('memory', context.memory) : '',
+    renderCalls(context.calls ?? []),
     trimmed,
     code,
     context.ownerNote ? fence('owner_note', context.ownerNote) : '',
@@ -94,6 +98,7 @@ export function renderAnswerInput(context: AnswerContext): string {
 
 const SOURCE_LABEL: Record<AnswerOutput['based_on'][number], string> = {
   chat: 'the chat',
+  calls: 'the call notes',
   spec: 'the spec',
   quote: 'the quote',
   payments: 'the payments',
@@ -124,11 +129,12 @@ export async function answerQuestion(
   question: string,
   ownerNote?: string,
 ): Promise<{ output: AnswerOutput; commit?: string | undefined }> {
-  const [spec, quote, payments, changes, memory, messages, code] = await Promise.all([
+  const [spec, quote, payments, changes, calls, memory, messages, code] = await Promise.all([
     latestSpec(ctx.db, project),
     latestQuote(ctx.db, project),
     paymentsFor(ctx.db, project),
     changeRequestsFor(ctx.db, project),
+    callsFor(ctx.db, project),
     safeRecall(ctx.memory, projectScope(project.name), question),
     readConversation(channel, project.created_at, { ownerId: ctx.env.DISCORD_OWNER_ID, clientId: project.client_id }, { includeBot: true }),
     ctx.github.readRepo(project.repo).catch((error: unknown) => {
@@ -145,6 +151,7 @@ export async function answerQuestion(
     quote: quote ? { quote, agreedBy: quoteAgreed } : undefined,
     payments,
     changes,
+    calls,
     memory,
     messages,
     code,

@@ -28,6 +28,8 @@ export function createDiscordClient(): Client {
       GatewayIntentBits.GuildInvites,
       // To hear Boran tag the bot in a project channel ("answer this").
       GatewayIntentBits.GuildMessages,
+      // To join a project's voice channel for /call, and see who is in it.
+      GatewayIntentBits.GuildVoiceStates,
       // Privileged: so messages include their text, for specs and answers.
       GatewayIntentBits.MessageContent,
     ],

@@ -13,7 +13,10 @@ export const FAST_MODEL = 'gemini-3.5-flash-lite';
 /** What the API accepts inline: the whole request must stay under 20 MB. */
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/heic', 'image/heif'] as const;
 
-export type Part = { type: 'text'; text: string } | { type: 'image'; data: string; mime_type: string };
+export type Part =
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mime_type: string }
+  | { type: 'audio'; data: string; mime_type: string };
 
 export interface JsonRequest<T> {
   model: string;

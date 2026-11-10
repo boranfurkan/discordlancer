@@ -1,6 +1,7 @@
 // Pure builders for the evidence pack, the daily sales report and the touch line.
 // Test projects (dl-test-*) are left out of the report and the touches.
 
+import { callLabel, type Call } from '../db/calls.js';
 import type { Agreement, Quote, Spec } from '../db/deals.js';
 import type { EventRecord } from '../db/events.js';
 import type { Payment } from '../db/payments.js';
@@ -30,11 +31,13 @@ export interface ExportInput {
   agreements: Agreement[];
   payments: Payment[];
   events: EventRecord[];
+  calls?: Call[];
   generatedAt: Date;
 }
 
 export function exportSummary(input: ExportInput): string {
   const { project, specs, quotes, agreements, payments, events } = input;
+  const calls = input.calls ?? [];
   const lines = [
     `# Evidence pack: ${project.name}`,
     '',
@@ -72,10 +75,39 @@ export function exportSummary(input: ExportInput): string {
         )
       : ['- none']),
     '',
+    '## Calls',
+    ...(calls.length
+      ? calls.map((call) => {
+          const recorded = call.participants.filter((person) => person.recorded).map((person) => `${person.name} (${person.role})`);
+          return `- ${callLabel(call)} UTC to ${iso(call.ended_at)}: recorded ${recorded.join(', ') || 'nobody'}, ${call.segments} turns, ${call.model}, prompt ${call.prompt_version}`;
+        })
+      : ['- none']),
+    '',
     `## Event log (${events.length} events)`,
     ...events.map((event) => `- ${iso(event.at)} ${event.actor} ${event.action} ${event.outcome}`),
   ];
   return `${lines.join('\n')}\n`;
+}
+
+/** Every call's summary and transcript, for the evidence pack. */
+export function callsMarkdown(projectName: string, calls: readonly Call[]): string {
+  const sections = calls.map((call) =>
+    [
+      `## Call ${callLabel(call)} UTC`,
+      '',
+      `Ended ${iso(call.ended_at)}. Recorded with consent: ${call.participants.filter((person) => person.recorded).map((person) => person.name).join(', ') || 'nobody'}.`,
+      '',
+      `**Summary (AI):** ${call.summary.summary}`,
+      ...call.summary.decisions.map((decision) => `- Decision: ${decision}`),
+      ...call.summary.action_items.map((item) => `- Action (${item.who}): ${item.what}`),
+      ...call.summary.open_questions.map((question) => `- Open question: ${question}`),
+      '',
+      '**Transcript (AI, from the recording):**',
+      '',
+      call.transcript,
+    ].join('\n'),
+  );
+  return `# Calls: ${projectName}\n\n${calls.length} recorded call(s). Times are UTC.\n\n${sections.join('\n\n')}\n`;
 }
 
 export interface TranscriptLine {
@@ -126,6 +158,8 @@ const PHRASES: Record<string, (project: string, data: Record<string, unknown>) =
   'development.started': (p) => `started building ${p}`,
   'delivery.marked': (p) => `marked ${p} delivered`,
   'question.answered': (p) => `had the AI assistant answer client questions on ${p}`,
+  'call.recorded': (p) => `had a call with the client of ${p} (recorded and transcribed with consent)`,
+  'docs.synced': (p) => `updated the project docs for ${p} in a pull request`,
   'project.claude_connected': (p) => `connected my Claude Code session to ${p}`,
   'dev.update_posted': (p) => `built ${p} with Claude Code, which posted progress updates for the client`,
   'project.cancelled': (p) => `cancelled ${p}`,

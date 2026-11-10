@@ -1,6 +1,7 @@
 import type { Command } from '../command.js';
 import { addGithub } from './addGithub.js';
 import { ask } from './ask.js';
+import { call } from './call.js';
 import { requestUpdate, status } from './afterDelivery.js';
 import { archive, cancel } from './close.js';
 import { confirmDelivery } from './delivery.js';
@@ -33,6 +34,7 @@ export const COMMANDS: readonly Command[] = [
   confirmDelivery,
   status,
   ask,
+  call,
   requestUpdate,
   exportEvidence,
   report,

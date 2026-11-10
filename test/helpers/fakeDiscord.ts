@@ -52,6 +52,9 @@ export interface FakeMessage {
   pin(): Promise<void>;
   /** discord.js: message.reply(payload), posted by the bot as a reply to this message. */
   reply(payload: unknown): Promise<FakeMessage>;
+  /** discord.js: message.edit(payload); keeps the latest content and buttons. */
+  edit(payload: unknown): Promise<FakeMessage>;
+  customIds: string[];
 }
 
 export interface Person {
@@ -121,6 +124,13 @@ export class FakeChannel {
         const reply = toReply('reply', payload);
         return channel.post({ id: channel.guild.botId, bot: true, name: 'Freelance Manager Bot' }, reply.content, reply.files, id);
       },
+      customIds: [],
+      async edit(payload: unknown) {
+        const update = toReply('update', payload);
+        message.content = update.content || message.content;
+        if (payload && typeof payload === 'object' && 'components' in payload) message.customIds = update.customIds;
+        return message;
+      },
     };
     this.history.push(message);
     return message;
@@ -128,7 +138,9 @@ export class FakeChannel {
 
   async send(payload: unknown): Promise<FakeMessage> {
     const reply = toReply('reply', payload);
-    return this.post({ id: this.guild.botId, bot: true, name: 'Freelance Manager Bot' }, reply.content, reply.files);
+    const message = this.post({ id: this.guild.botId, bot: true, name: 'Freelance Manager Bot' }, reply.content, reply.files);
+    message.customIds = reply.customIds;
+    return message;
   }
 
   async createInvite(): Promise<{ code: string; url: string }> {
@@ -231,6 +243,7 @@ export function commandInteraction(guild: FakeGuild, channel: FakeChannel, perso
     inCachedGuild: () => true,
     options: {
       getString: (name: string) => (typeof options[name] === 'string' ? (options[name] as string) : null),
+      getSubcommand: () => String(options.subcommand ?? ''),
       getBoolean: (name: string) => (typeof options[name] === 'boolean' ? (options[name] as boolean) : null),
       getUser: (name: string) => {
         const user = options[name] as Person | undefined;

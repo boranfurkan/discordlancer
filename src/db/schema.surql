@@ -132,3 +132,28 @@ DEFINE FIELD OVERWRITE issue_number ON change_request TYPE option<int>;
 DEFINE FIELD OVERWRITE pr_number ON change_request TYPE option<int>;
 DEFINE FIELD OVERWRITE created_at ON change_request TYPE datetime DEFAULT time::now() READONLY;
 DEFINE FIELD OVERWRITE updated_at ON change_request TYPE datetime VALUE time::now();
+
+-- Calls (append-only) -------------------------------------------------------
+-- One record per recorded call, written once after it is transcribed. The audio is
+-- never stored: only the transcript of the people who agreed to be recorded.
+
+DEFINE TABLE OVERWRITE call SCHEMAFULL;
+DEFINE FIELD OVERWRITE project ON call TYPE record<project>;
+DEFINE FIELD OVERWRITE started_at ON call TYPE datetime;
+DEFINE FIELD OVERWRITE ended_at ON call TYPE datetime;
+DEFINE FIELD OVERWRITE participants ON call TYPE array<object>;
+DEFINE FIELD OVERWRITE participants.*.user_id ON call TYPE string;
+DEFINE FIELD OVERWRITE participants.*.name ON call TYPE string;
+DEFINE FIELD OVERWRITE participants.*.role ON call TYPE string ASSERT $value IN ["owner", "client", "other"];
+DEFINE FIELD OVERWRITE participants.*.recorded ON call TYPE bool;
+DEFINE FIELD OVERWRITE transcript ON call TYPE string;
+DEFINE FIELD OVERWRITE summary ON call TYPE object FLEXIBLE;
+DEFINE FIELD OVERWRITE speech_seconds ON call TYPE int;
+DEFINE FIELD OVERWRITE segments ON call TYPE int;
+DEFINE FIELD OVERWRITE model ON call TYPE string;
+DEFINE FIELD OVERWRITE prompt_version ON call TYPE string;
+DEFINE FIELD OVERWRITE created_at ON call TYPE datetime VALUE time::now() READONLY;
+DEFINE INDEX OVERWRITE call_project ON call FIELDS project, started_at;
+DEFINE EVENT OVERWRITE append_only ON call WHEN $event IN ["UPDATE", "DELETE"] THEN {
+  THROW "call records are append-only";
+};

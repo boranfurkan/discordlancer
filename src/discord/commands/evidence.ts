@@ -2,12 +2,13 @@
 
 import { AttachmentBuilder, ChannelType, MessageFlags, SlashCommandBuilder, type TextChannel } from 'discord.js';
 import { listAgreements, listQuotes, listSpecs } from '../../db/deals.js';
+import { callsFor } from '../../db/calls.js';
 import { eventsForProject, eventsSince } from '../../db/events.js';
 import { allPayments, paymentsFor } from '../../db/payments.js';
 import { londonDayStart } from '../../domain/deadline.js';
 import { ensureOwnerChannel } from '../channels.js';
 import { requireProject, type Command } from '../command.js';
-import { exportSummary, salesReport, touchLine, transcriptMarkdown, type TranscriptLine } from '../evidence.js';
+import { callsMarkdown, exportSummary, salesReport, touchLine, transcriptMarkdown, type TranscriptLine } from '../evidence.js';
 
 const MAX_MESSAGES = 5_000;
 const MAX_SPEC_FILES = 6; // Discord allows 10 files per message.
@@ -46,23 +47,25 @@ export const exportEvidence: Command = {
     const project = requireProject(run);
     const { interaction, ctx } = run;
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const [specs, quotes, agreements, payments, events] = await Promise.all([
+    const [specs, quotes, agreements, payments, events, calls] = await Promise.all([
       listSpecs(ctx.db, project),
       listQuotes(ctx.db, project),
       listAgreements(ctx.db, project),
       paymentsFor(ctx.db, project),
       eventsForProject(ctx.db, project.id),
+      callsFor(ctx.db, project),
     ]);
     const generatedAt = new Date();
     const stamp = generatedAt.toISOString().slice(0, 10);
     const transcript = interaction.channel?.type === ChannelType.GuildText ? await readAll(interaction.channel) : [];
 
     const files = [
-      new AttachmentBuilder(Buffer.from(exportSummary({ project, specs, quotes, agreements, payments, events, generatedAt })), {
+      new AttachmentBuilder(Buffer.from(exportSummary({ project, specs, quotes, agreements, payments, events, calls, generatedAt })), {
         name: `${project.name}-evidence-${stamp}.md`,
       }),
       new AttachmentBuilder(Buffer.from(transcriptMarkdown(project.name, transcript)), { name: `${project.name}-transcript-${stamp}.md` }),
       new AttachmentBuilder(Buffer.from(`${JSON.stringify(events, null, 2)}\n`), { name: `${project.name}-events-${stamp}.json` }),
+      ...(calls.length ? [new AttachmentBuilder(Buffer.from(callsMarkdown(project.name, calls)), { name: `${project.name}-calls-${stamp}.md` })] : []),
       ...specs.slice(-MAX_SPEC_FILES).map(
         (spec) => new AttachmentBuilder(Buffer.from(spec.markdown), { name: `${project.name}-spec-v${spec.version}.md` }),
       ),
@@ -70,7 +73,7 @@ export const exportEvidence: Command = {
     const owner = await ensureOwnerChannel(interaction.guild, ctx.env.DISCORD_OWNER_ID);
     const skipped = specs.length > MAX_SPEC_FILES ? ` Only the latest ${MAX_SPEC_FILES} spec versions are attached.` : '';
     await owner.send({
-      content: `Evidence pack for **${project.name}**: summary, transcript (${transcript.length} messages), ${events.length} events and specs.${skipped}`,
+      content: `Evidence pack for **${project.name}**: summary, transcript (${transcript.length} messages), ${events.length} events${calls.length ? `, ${calls.length} call transcript(s)` : ''} and specs.${skipped}`,
       files,
     });
     await interaction.editReply(`Evidence pack sent to <#${owner.id}>.`);
