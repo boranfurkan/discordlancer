@@ -32,7 +32,7 @@ The bot runs as one always-on process. Replit's **Reserved VM** keeps it on. Aut
      ```
      Keep the `deploymentTarget` line Replit adds.
    - **No top-level `run = …` line.** It drives the editor's green Run button, which would start a second copy of the bot.
-   - **The status page:** Replit only finishes publishing once a web page answers. The bot serves a tiny status page on `$PORT` or 8080, saying only `ok` and whether Discord is connected. Without it, publishing fails at **Promote** after about 10 minutes. `ignorePorts = true` didn't prevent that. The same port also serves `/mcp` for Claude Code's progress updates; it answers only requests carrying a project key (see `PLAN.md`).
+   - **The status page:** Replit only finishes publishing once a web page answers. The bot serves a tiny status page on `$PORT` or 8080, saying only `ok` and whether Discord is connected. Without it, publishing fails at **Promote** after about 10 minutes. `ignorePorts = true` didn't prevent that. Recorded calls need nothing extra on Replit: the voice library's encryption support (`@snazzah/davey`) ships a ready-made Linux build in the lockfile, and the voice intent isn't privileged. The same port also serves `/mcp` for Claude Code's progress updates; it answers only requests carrying a project key (see `PLAN.md`).
    - **Don't use "Fix with Agent"** or Replit's Agent: it changes code.
    - **To update the bot later:** push to GitHub, run `git pull` in the Replit Shell (or use the Git pane), then **Republish**.
 6. **Check it's live.**

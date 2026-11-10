@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createGitHub, GitHubError, GITHUB_USERNAME, REPO_TOPIC } from '../../src/services/github.js';
+import { createGitHub, gitBlobSha, GitHubError, GITHUB_USERNAME, REPO_TOPIC } from '../../src/services/github.js';
 
 const env = { GITHUB_TOKEN: 'token-for-tests', GITHUB_OWNER: 'example-owner' };
 
@@ -109,5 +109,51 @@ describe('addCollaborator', () => {
     ['x'.repeat(40), false],
   ])('username %j valid: %s', (name, valid) => {
     expect(GITHUB_USERNAME.test(name)).toBe(valid);
+  });
+});
+
+describe('commitToBranch', () => {
+  const base = '/repos/example-owner/alpha';
+  const routes = (existing: string) => ({
+    [`GET ${base}`]: () => ({ status: 200, json: { default_branch: 'master' } }),
+    [`GET ${base}/git/ref/heads%2Fmaster`]: () => ({ status: 200, json: { object: { sha: 'base1' } } }),
+    [`GET ${base}/git/commits/base1`]: () => ({ status: 200, json: { tree: { sha: 'tree1' } } }),
+    [`GET ${base}/git/trees/tree1`]: () => ({ status: 200, json: { tree: [{ path: 'docs/project/README.md', type: 'blob', sha: gitBlobSha(existing) }] } }),
+    [`POST ${base}/git/trees`]: () => ({ status: 201, json: { sha: 'tree2' } }),
+    [`POST ${base}/git/commits`]: () => ({ status: 201, json: { sha: 'commit2' } }),
+    [`PATCH ${base}/git/refs/heads%2Fdiscordlancer%2Fproject-docs`]: () => ({ status: 422, json: { message: 'Reference does not exist' } }),
+    [`POST ${base}/git/refs`]: () => ({ status: 201, json: { ref: 'refs/heads/discordlancer/project-docs' } }),
+  });
+  const files = [
+    { path: 'docs/project/README.md', content: 'same\n' },
+    { path: 'docs/project/decisions.md', content: '- new\n' },
+  ];
+
+  it('writes only changed files, as one commit on top of the default branch, making the branch', async () => {
+    const { fetchImpl, calls } = fakeFetch(routes('same\n'));
+    const result = await createGitHub(env, { fetch: fetchImpl }).commitToBranch('example-owner/alpha', 'discordlancer/project-docs', files, 'Update docs');
+    expect(result).toEqual({ changed: true, sha: 'commit2', base: 'master', paths: ['docs/project/decisions.md'] });
+    const tree = calls.find((call) => call.method === 'POST' && call.path.endsWith('/git/trees'))!.body as { base_tree: string; tree: Array<{ path: string }> };
+    expect(tree.base_tree).toBe('tree1');
+    expect(tree.tree.map((entry) => entry.path)).toEqual(['docs/project/decisions.md']);
+    expect(calls.find((call) => call.method === 'POST' && call.path.endsWith('/git/commits'))!.body).toMatchObject({ parents: ['base1'], tree: 'tree2' });
+    expect(calls.find((call) => call.method === 'POST' && call.path.endsWith('/git/refs'))!.body).toEqual({ ref: 'refs/heads/discordlancer/project-docs', sha: 'commit2' });
+  });
+
+  it('commits nothing when every file is already the same', async () => {
+    const { fetchImpl, calls } = fakeFetch(routes('same\n'));
+    const result = await createGitHub(env, { fetch: fetchImpl }).commitToBranch('example-owner/alpha', 'discordlancer/project-docs', files.slice(0, 1), 'Update docs');
+    expect(result).toEqual({ changed: false });
+    expect(calls.some((call) => call.method !== 'GET')).toBe(false);
+  });
+
+  it('never writes to main, master or anything outside its own branches, or to an unsafe path', async () => {
+    const { fetchImpl, calls } = fakeFetch(routes('same\n'));
+    const github = createGitHub(env, { fetch: fetchImpl });
+    for (const branch of ['main', 'master', 'feature/x', 'discordlancer/../main']) {
+      await expect(github.commitToBranch('example-owner/alpha', branch, files, 'x')).rejects.toThrow('Refusing to write to the branch');
+    }
+    await expect(github.commitToBranch('example-owner/alpha', 'discordlancer/docs', [{ path: '../x.md', content: '' }], 'x')).rejects.toThrow('Refusing to write the path');
+    expect(calls).toEqual([]);
   });
 });

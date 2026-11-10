@@ -244,6 +244,15 @@ Skills: the `tessl__*` skills, `gemini-api-dev`, `surrealdb-agent-memory-docs`.
 - [x] Guardrails tested against the real Gemini: a normal question, a discount request (refused, flagged to Boran) and a prompt injection (refused).
 - [ ] **Live check after deploying:** in a test channel, try `/ask`, a tagged reply and the menu once each.
 
+### Phase 10: Calls and project docs (added 10 Nov)
+
+- [x] `/call start | stop | retry`: consent buttons, per-speaker recording, Ogg writer, Gemini transcription and summary, append-only `call` table, notes and transcript in the channel, memory. See `PLAN.md`, Recorded calls.
+- [x] Calls feed `/ask`, `/create-specs` and the evidence pack.
+- [x] `/sync-docs`: writer and reviewer passes, citation check, one pull request on `discordlancer/project-docs`. See `PLAN.md`, Project docs in the repo.
+- [x] Real checks: spoken audio through the real transcription and summary; the real docs passes; a real commit and pull request with the bot's token.
+- [ ] **Live after deploying:** a real call in a test project's voice channel (Boran talks for a minute), `/call stop`, the notes; then `/sync-docs` there.
+- [ ] **Boran:** delete the test repo `boranfurkan/dl-test-docs` afterwards.
+
 ### Phase 9: Progress updates from Claude Code (added 10 Nov)
 
 - [x] MCP endpoint at `/mcp` on the bot's web port, with a key per project: `get_project_brief` and `post_update`. See `PLAN.md`, Progress updates from Claude Code.

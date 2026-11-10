@@ -23,8 +23,9 @@ import { ANSWER_SYSTEM } from '../../src/prompts/answers.js';
 import type { Env } from '../../src/env.js';
 import { STATUS_SYSTEM, TRIAGE_SYSTEM } from '../../src/prompts/after-delivery.js';
 import { SPEC_SYSTEM } from '../../src/prompts/specs.js';
+import { DOCS_REVIEW_SYSTEM, DOCS_SYSTEM } from '../../src/prompts/docs.js';
 import type { GeminiApi, JsonRequest } from '../../src/services/gemini.js';
-import type { GitHubApi, PullInfo } from '../../src/services/github.js';
+import type { GitHubApi, PullInfo, RepoFile } from '../../src/services/github.js';
 import type { MemoryApi } from '../../src/services/memory.js';
 import { newReference, type SolanaApi } from '../../src/services/solana.js';
 import { memoryDb } from '../helpers/db.js';
@@ -51,6 +52,10 @@ const github = {
   issues: [] as Array<{ repo: string; title: string; body: string; labels: string[] }>,
   /** Pull requests Tessl has opened, by the issue they answer. */
   pulls: new Map<number, PullInfo>(),
+  /** The docs folder on the main branch. */
+  docs: new Map<string, string>(),
+  commits: [] as Array<{ branch: string; files: RepoFile[]; message: string }>,
+  docPulls: [] as Array<{ title: string; body: string }>,
 };
 const githubApi: GitHubApi = {
   ensureRepo: async (name) => {
@@ -77,7 +82,29 @@ const githubApi: GitHubApi = {
     if (!pull) throw new Error(`no pull request #${number}`);
     return pull;
   },
+  readFolder: async () => new Map(github.docs),
+  commitToBranch: async (_repo, branch, files, message) => {
+    const changed = files.filter((file) => github.docs.get(file.path) !== file.content);
+    if (changed.length === 0) return { changed: false };
+    github.commits.push({ branch, files: changed, message });
+    return { changed: true, sha: 'c0ffee1', base: 'main', paths: changed.map((file) => file.path) };
+  },
+  upsertPull: async (repo, _branch, title, body) => {
+    github.docPulls.push({ title, body });
+    return { number: 7, url: `https://github.com/${repo}/pull/7`, created: github.docPulls.length === 1 };
+  },
 };
+
+/** The fake docs writer cites the chat message about barbers by its real time, and one source that doesn't exist. */
+function fakeDocs(text: string) {
+  const barber = /\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}) UTC\] Client \(Ahmet\): Remember, customers should be able to pick a barber/.exec(text)?.[1] ?? 'missing';
+  return {
+    overview: '# Booking app\n\nA booking app for a barber shop. See requirements.md.',
+    requirements: '## Agreed (spec v1)\n- Book a slot [spec v1]\n\n## Discussed since, not agreed yet\n- Customers pick a barber [chat ' + barber + ']',
+    decisions: '- **2001-01-01**: Something nobody said. [chat 2001-01-01 00:00]',
+    open_questions: '- Which email provider? (client) [spec v1]',
+  };
+}
 
 const geminiInputs: string[] = [];
 const geminiApi: GeminiApi = {
@@ -98,6 +125,11 @@ const geminiApi: GeminiApi = {
       answer = /discount/i.test(question)
         ? { answer: 'The agreed price is 0.01 USDC for spec v1. Furkan decides anything beyond that.', needs_owner: true, owner_note: 'The client asks for a discount.', confidence: 'high', based_on: ['quote'] }
         : { answer: 'Booking a slot is in the agreed spec, and src/booking.ts has a book() function.', needs_owner: false, owner_note: '', confidence: 'medium', based_on: ['spec', 'code', 'chat'] };
+    } else if (request.system === DOCS_SYSTEM) {
+      answer = { ...fakeDocs(text), change_summary: github.docs.size ? [] : ['First version of the project docs'] };
+    } else if (request.system === DOCS_REVIEW_SYSTEM) {
+      expect(text).toContain('<draft>');
+      answer = { ...fakeDocs(text), issues: ['Removed a claim that SMS reminders were agreed'] };
     } else {
       throw new Error('unexpected Gemini call');
     }
@@ -378,6 +410,40 @@ describe('a project from start to finish', () => {
     expect(channel.history.at(-1)?.replyTo).toBe(another.id);
   });
 
+  it('13c. Boran syncs the project docs into the repo, as a pull request he reviews', async () => {
+    expect(said(await run(CLIENT, channel, 'sync-docs'))).toBe('Only Furkan can do this.');
+    const reply = said(await run(BORAN, channel, 'sync-docs'));
+    expect(reply).toContain('Opened the docs pull request for **booking-app**: https://github.com/boranfurkan/booking-app/pull/7');
+    expect(reply).toContain("1 citation(s) couldn't be matched");
+
+    const writer = geminiInputs.at(-2)!;
+    expect(writer).toContain('<spec version="1" status="agreed by both"');
+    expect(writer).toContain('customers should be able to pick a barber');
+    expect(writer).toContain('<current_docs>There are no docs in the repository yet.</current_docs>');
+    expect(geminiInputs.at(-1)).toContain('<draft>');
+
+    const [commit] = github.commits;
+    expect(commit!.branch).toBe('discordlancer/project-docs');
+    expect(commit!.files.map((file) => file.path)).toEqual([
+      'docs/project/README.md',
+      'docs/project/requirements.md',
+      'docs/project/decisions.md',
+      'docs/project/open-questions.md',
+    ]);
+    const body = github.docPulls[0]!.body;
+    expect(body).toContain('- First version of the project docs');
+    expect(body).toContain('fixed 1 thing:\n- Removed a claim that SMS reminders were agreed');
+    expect(body).toContain("**Citations:** 4 checked; these couldn't be matched to a source, so check them before merging:\n- [chat 2001-01-01 00:00]");
+    expect(body).toMatch(/\*\*Sources:\*\* \d+ chat messages, spec v1 \(agreed by both\), quote v1/);
+    expect(guild.channelNamed('owner-desk').botText().at(-1)).toContain('Opened the docs pull request');
+
+    // Boran merges it; a second sync finds nothing new.
+    for (const file of commit!.files) github.docs.set(file.path, file.content);
+    expect(said(await run(BORAN, channel, 'sync-docs'))).toContain('The docs in the repo are already up to date; nothing changed.');
+    expect(github.commits).toHaveLength(1);
+    expect(geminiInputs.at(-2)).toContain('<doc path="docs/project/README.md">');
+  });
+
   it('14. Boran marks delivery; only the client can confirm it', async () => {
     expect(said(await run(CLIENT, channel, 'confirm-delivery'))).toContain("hasn't marked it as delivered yet");
     const marked = await run(BORAN, channel, 'confirm-delivery', { note: 'Live at https://booking.example' });
@@ -449,6 +515,7 @@ describe('a project from start to finish', () => {
     expect(touches).toContain('set up booking-app');
     expect(touches).toContain('posted quote v1 for booking-app');
     expect(touches).toContain('had the AI assistant answer client questions on booking-app');
+    expect(touches).toContain('updated the project docs for booking-app in a pull request');
   });
 
   it('18. The record: every step is an event, and memory heard the key moments', async () => {
@@ -469,6 +536,7 @@ describe('a project from start to finish', () => {
       'status.checked',
       'ask.answered',
       'question.answered',
+      'docs.synced',
       'delivery.marked',
       'delivery.confirmed',
       'support.started',

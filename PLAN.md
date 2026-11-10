@@ -88,6 +88,7 @@ src/
     memory.ts           Agent Memory REST calls
     tavily.ts           search
   mcp/                  the MCP endpoint for Boran's Claude Code sessions (progress updates)
+  voice/                recorded calls: recorder, Ogg writer, transcription, the call manager
   health.ts             the web port: status page, and /mcp
   prompts/              prompt text, each with a version name
 test/
@@ -112,6 +113,7 @@ SurrealDB 4 on SurrealDB Cloud (Earth): namespace `freelance`, database `bot`. E
 | `payment_request` | Project, quote version, amount, reference key, status (`open`, `paid`, `expired`) | Reference |
 | `payment` | Project, request, signature, from wallet, to wallet, amount, slot, block time, verified time | Signature |
 | `change_request` | Project, text, Gemini's triage, status, issue number, PR number | |
+| `call` | **Append-only:** project, start and end, participants (name, role, whether they agreed to be recorded), AI transcript, AI summary (decisions, action items, open questions), speech seconds, turns, model, prompt versions. Never the audio | |
 
 **Rules:**
 - **Money is stored as integers in micro-USDC.** USDC has 6 decimals, so 250 USDC is `250000000`. Never use floats for money.
@@ -250,6 +252,28 @@ While Boran builds a client's app with Claude Code, the session can tell the cli
   - `post_update`: summary, done, next, and optionally what's needed from the client. Posted in the key's own project channel, pinging nobody, ending "Written by Furkan's AI coding assistant (Claude) during his work session". Refused before the client joins, after cancel or archive, over 6 a day, over 1,900 characters, or when it looks like it contains a key. Recorded as `dev.update_posted` (actor `owner`) and remembered in Agent Memory, so `/ask` can answer "how's it going?".
 - **Boran sees every update before it goes out:** Claude Code asks permission for `post_update` and shows the text. Keep it that way rather than allowing it always.
 - **Touches:** the build session is one touch. Updates posted during it don't add more; `/touches` describes them as part of the build session.
+
+## Recorded calls
+
+Boran runs `/call start` in a project channel. The bot joins the project's private voice channel (made the first time, visible to Boran, the bot and the client) and posts a consent message with **Record me** and **Don't record me** buttons.
+
+- **Consent first:** starting the call counts as Boran's agreement; the client is pinged and isn't recorded until they press **Record me**. Discord sends each speaker's audio separately, so the bot never subscribes to anyone who hasn't agreed. Pressing **Don't record me** later drops everything recorded from that person. Each answer is a `call.consent` event.
+- **Recording** (`@discordjs/voice` 0.19.2, which handles Discord's end-to-end voice encryption, DAVE): each person's turn, from when they start talking to a second of silence, is kept as Opus packets in memory. Turns under 0.6 s are dropped as noise. A guard stops at 150 MB.
+- **Ending:** `/call stop`, everyone leaving for 2 minutes, 2 hours, a lost connection, or the bot restarting. The consent message is closed.
+- **Then:** each turn is wrapped in an Ogg file (`src/voice/ogg.ts`, our own small writer: no native code, no alpha packages) and sent to Gemini in batches, which transcribes it word for word. The speaker is known from Discord, not guessed. Gemini then summarises the call: decisions (only what both agreed), action items, open questions. The call is saved (append-only, with a `call.recorded` event), the notes are posted in the channel marked as AI-written with the transcript attached, and the decisions and action items go into Agent Memory. **The audio is never stored.**
+- **If transcription fails,** the recording is kept in memory, Boran is told in `#owner-desk`, and `/call retry` tries again.
+- **Calls feed** `/ask`, `/create-specs`, `/sync-docs` and the evidence pack (`/export` attaches every transcript).
+- **Tested 10 Nov** with spoken audio through the real pipeline: Gemini transcribed each turn word for word, and the summary kept deposits as an open question because they needed a quote.
+- **Touches:** a call with a client is a touch, recorded or not.
+
+## Project docs in the repo
+
+`/sync-docs` (owner) writes the project's docs into its repo as one pull request: `docs/project/README.md` (overview), `requirements.md` (agreed spec, then "discussed since, not agreed yet"), `decisions.md` (a dated log; replaced decisions are kept and marked, never deleted), `open-questions.md`, and one file per call under `calls/` (the summary, not the transcript). Claude Code reads them at the start of a session (`CLAUDE.md` says so).
+
+- **Sources:** the whole chat with images and files, every spec version and its agreement, the quote, payments, change requests, progress updates, calls, Agent Memory, and the docs already in the repo (so each run is an update, not a rewrite).
+- **Two AI passes** (prompt `docs-v1`): a writer (low thinking, fast), then a reviewer (medium thinking) that checks every statement against the same sources, fixes anything unsupported, and lists its fixes in the pull request. Every requirement, decision and open question cites its source, like `[chat 2026-11-12 14:03]` or `[call 2026-11-13 10:00, 00:12:30]`; code then checks each citation against the real messages, calls, specs, quotes, change requests and updates, and lists any that don't match. Docs that look like they contain a key are not committed.
+- **GitHub:** one commit on `discordlancer/project-docs` on top of the default branch, only for files that changed; the branch is reset each run, and the one open pull request is updated. The bot can write only to branches under `discordlancer/`, never `main` or `master`. Nothing changed: no commit.
+- **Tested 10 Nov** with the real Gemini: 22 citations, all matching; the reviewer fixed real mistakes (a colour scheme written as agreed when it was only discussed). About 3 minutes. A real commit and pull request were made on a test repo with the bot's token.
 
 ## Change requests after delivery
 

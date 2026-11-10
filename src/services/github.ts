@@ -2,10 +2,13 @@
 // collaborator. Repos we create carry the `discordlancer` topic, so we never take
 // over an unrelated repo that happens to have the same name.
 
+import { createHash } from 'node:crypto';
 import { Octokit } from '@octokit/rest';
 import type { Env } from '../env.js';
 
 export const REPO_TOPIC = 'discordlancer';
+/** Branches the bot may write to. Nothing else, so it can never touch main or master. */
+export const BOT_BRANCH_PREFIX = 'discordlancer/';
 const TIMEOUT_MS = 20_000;
 
 export class GitHubError extends Error {
@@ -76,6 +79,33 @@ export interface GitHubApi {
   findPullForIssue(repo: string, issue: number): Promise<PullInfo | undefined>;
   /** A pull request's current state. */
   getPull(repo: string, number: number): Promise<PullInfo>;
+  /** The text files under a folder on the default branch, by path. */
+  readFolder(repo: string, folder: string): Promise<Map<string, string>>;
+  /**
+   * Commits these files on top of the default branch, as one commit on `branch` (made, or
+   * reset to it). Only files that differ are written; with none, nothing is committed.
+   */
+  commitToBranch(repo: string, branch: string, files: ReadonlyArray<RepoFile>, message: string): Promise<CommitResult>;
+  /** Opens a pull request from `branch` into the default branch, or updates the open one. */
+  upsertPull(repo: string, branch: string, title: string, body: string): Promise<{ number: number; url: string; created: boolean }>;
+}
+
+export interface RepoFile {
+  path: string;
+  content: string;
+}
+
+export type CommitResult = { changed: false } | { changed: true; sha: string; base: string; paths: string[] };
+
+/** Pure: the id git gives a file's contents, to tell whether it changed. */
+export function gitBlobSha(content: string): string {
+  const body = Buffer.from(content, 'utf8');
+  return createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${body.length}\0`), body])).digest('hex');
+}
+
+/** Pure: a safe repo path for a file we write (no "..", no absolute paths). */
+export function isSafePath(path: string): boolean {
+  return /^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/.test(path) && !path.split('/').includes('..');
 }
 
 const SKIP_DIRS = /(^|\/)(node_modules|dist|build|out|coverage|vendor|\.git|\.next|\.venv|__pycache__)\//;
@@ -231,6 +261,69 @@ export function createGitHub(
         ...signal(),
       });
       return matchPullForIssue(data, issue);
+    },
+
+    async readFolder(repo, folder) {
+      const [repoOwner, repoName] = repo.split('/');
+      if (!repoOwner || !repoName) throw new GitHubError(`Bad repo name ${repo}`);
+      const { data: info } = await octokit.rest.repos.get({ owner: repoOwner, repo: repoName, ...signal() });
+      const { data: ref } = await octokit.rest.repos.getBranch({ owner: repoOwner, repo: repoName, branch: info.default_branch, ...signal() });
+      const { data: tree } = await octokit.rest.git.getTree({ owner: repoOwner, repo: repoName, tree_sha: ref.commit.sha, recursive: 'true', ...signal() });
+      const files = new Map<string, string>();
+      const wanted = tree.tree.filter((entry) => entry.type === 'blob' && entry.path?.startsWith(`${folder}/`) && (entry.size ?? 0) <= 200_000).slice(0, 60);
+      for (const entry of wanted) {
+        const { data } = await octokit.rest.repos.getContent({ owner: repoOwner, repo: repoName, path: entry.path!, ref: ref.commit.sha, mediaType: { format: 'raw' }, ...signal() });
+        if (typeof data === 'string') files.set(entry.path!, data);
+      }
+      return files;
+    },
+
+    async commitToBranch(repo, branch, files, message) {
+      const [repoOwner, repoName] = repo.split('/');
+      if (!repoOwner || !repoName) throw new GitHubError(`Bad repo name ${repo}`);
+      // The bot only ever writes to its own branches; people merge them.
+      if (!branch.startsWith(BOT_BRANCH_PREFIX) || !isSafePath(branch)) throw new GitHubError(`Refusing to write to the branch ${branch}`);
+      const unsafe = files.find((file) => !isSafePath(file.path));
+      if (unsafe) throw new GitHubError(`Refusing to write the path ${unsafe.path}`);
+      const where = { owner: repoOwner, repo: repoName };
+      const { data: info } = await octokit.rest.repos.get({ ...where, ...signal() });
+      const base = info.default_branch;
+      const { data: baseRef } = await octokit.rest.git.getRef({ ...where, ref: `heads/${base}`, ...signal() });
+      const baseSha = baseRef.object.sha;
+      const { data: baseCommit } = await octokit.rest.git.getCommit({ ...where, commit_sha: baseSha, ...signal() });
+      const { data: tree } = await octokit.rest.git.getTree({ ...where, tree_sha: baseCommit.tree.sha, recursive: 'true', ...signal() });
+      const existing = new Map(tree.tree.filter((entry) => entry.type === 'blob').map((entry) => [entry.path, entry.sha]));
+      const changed = files.filter((file) => existing.get(file.path) !== gitBlobSha(file.content));
+      if (changed.length === 0) return { changed: false };
+      const { data: newTree } = await octokit.rest.git.createTree({
+        ...where,
+        base_tree: baseCommit.tree.sha,
+        tree: changed.map((file) => ({ path: file.path, mode: '100644' as const, type: 'blob' as const, content: file.content })),
+        ...signal(),
+      });
+      const { data: commit } = await octokit.rest.git.createCommit({ ...where, message, tree: newTree.sha, parents: [baseSha], ...signal() });
+      try {
+        await octokit.rest.git.updateRef({ ...where, ref: `heads/${branch}`, sha: commit.sha, force: true, ...signal() });
+      } catch (error) {
+        if (status(error) !== 422 && status(error) !== 404) throw error;
+        await octokit.rest.git.createRef({ ...where, ref: `refs/heads/${branch}`, sha: commit.sha, ...signal() });
+      }
+      return { changed: true, sha: commit.sha, base, paths: changed.map((file) => file.path) };
+    },
+
+    async upsertPull(repo, branch, title, body) {
+      const [repoOwner, repoName] = repo.split('/');
+      if (!repoOwner || !repoName) throw new GitHubError(`Bad repo name ${repo}`);
+      const where = { owner: repoOwner, repo: repoName };
+      const { data: open } = await octokit.rest.pulls.list({ ...where, head: `${repoOwner}:${branch}`, state: 'open', ...signal() });
+      const existing = open[0];
+      if (existing) {
+        const { data } = await octokit.rest.pulls.update({ ...where, pull_number: existing.number, title, body, ...signal() });
+        return { number: data.number, url: data.html_url, created: false };
+      }
+      const { data: info } = await octokit.rest.repos.get({ ...where, ...signal() });
+      const { data } = await octokit.rest.pulls.create({ ...where, title, body, head: branch, base: info.default_branch, ...signal() });
+      return { number: data.number, url: data.html_url, created: true };
     },
 
     async getPull(repo, number) {

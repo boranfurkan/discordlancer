@@ -149,14 +149,8 @@ async function download(url: string): Promise<Buffer> {
   return Buffer.from(await response.arrayBuffer());
 }
 
-/** Downloads the planned attachments and builds Gemini's input: text first, then the images in order. */
-export async function buildSpecInput(
-  messages: readonly ChatMessage[],
-  previous: { version: number; markdown: string } | undefined,
-  memory = '',
-  /** Recorded calls, already rendered by renderCalls(). */
-  calls = '',
-): Promise<{ input: Part[]; plan: AttachmentPlan }> {
+/** Downloads the planned attachments: the conversation as text, and the images as parts, in order. */
+export async function conversationParts(messages: readonly ChatMessage[]): Promise<{ text: string; images: Part[]; plan: AttachmentPlan }> {
   const plan = planAttachments(messages);
   const fileTexts = new Map<string, string>();
   for (const file of plan.textFiles) fileTexts.set(file.url, (await download(file.url)).toString('utf8'));
@@ -164,12 +158,24 @@ export async function buildSpecInput(
   for (const image of plan.images) {
     images.push({ type: 'image', data: (await download(image.url)).toString('base64'), mime_type: image.contentType!.split(';')[0]!.trim() });
   }
+  const note = plan.images.length ? `\n\nThe ${plan.images.length} image(s) after this text are the attachments numbered in the conversation, in order.` : '';
+  return { text: `${renderConversation(messages, plan, fileTexts)}${note}`, images, plan };
+}
+
+/** Gemini's input for a spec: text first, then the images in order. */
+export async function buildSpecInput(
+  messages: readonly ChatMessage[],
+  previous: { version: number; markdown: string } | undefined,
+  memory = '',
+  /** Recorded calls, already rendered by renderCalls(). */
+  calls = '',
+): Promise<{ input: Part[]; plan: AttachmentPlan }> {
+  const conversation = await conversationParts(messages);
   const sections = [
     previous ? `<previous_spec version="${previous.version}">\n${previous.markdown}\n</previous_spec>` : 'There is no previous spec.',
     memory ? `<memory>\n${memory}\n</memory>` : '',
     calls,
-    renderConversation(messages, plan, fileTexts),
-    plan.images.length ? `The ${plan.images.length} image(s) below are the attachments numbered in the conversation, in order.` : '',
+    conversation.text,
   ].filter(Boolean);
-  return { input: [{ type: 'text', text: sections.join('\n\n') }, ...images], plan };
+  return { input: [{ type: 'text', text: sections.join('\n\n') }, ...conversation.images], plan: conversation.plan };
 }
