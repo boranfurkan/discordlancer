@@ -12,9 +12,10 @@ import {
   type ButtonInteraction,
   type Guild,
 } from 'discord.js';
-import { getProjectByChannel, moveStage, updateProject, type Project } from '../../db/projects.js';
+import { isClientMember, getProjectByChannel, moveStage, updateProject, type Project } from '../../db/projects.js';
 import { log } from '../../log.js';
 import { ensureOwnerChannel } from '../channels.js';
+import { clientMentions } from '../texts.js';
 import { requireProject, UserError, type BotContext, type Command } from '../command.js';
 import { OWNER_NAME } from '../guards.js';
 import { projectScope, safeRemember } from '../../services/memory.js';
@@ -32,9 +33,9 @@ function confirmRow(disabled: boolean) {
 }
 
 /** Pure check shared by the button and the command: may this person confirm now? */
-export function canConfirm(project: Pick<Project, 'stage' | 'client_id' | 'delivery_marked_at'>, userId: string): string | undefined {
+export function canConfirm(project: Pick<Project, 'stage' | 'client_id' | 'client_ids' | 'delivery_marked_at'>, userId: string): string | undefined {
   if (project.stage !== 'in_development') return "This project isn't waiting for a delivery confirmation.";
-  if (userId !== project.client_id) return 'Only the client confirms the delivery.';
+  if (!isClientMember(project, userId)) return 'Only the client confirms the delivery.';
   if (!project.delivery_marked_at) return `${OWNER_NAME} hasn't marked it as delivered yet.`;
   return undefined;
 }
@@ -89,7 +90,7 @@ export const confirmDelivery: Command = {
         { delivery_marked_at: new Date(), ...(note ? { delivery_note: note } : {}) },
         { actor: 'owner', actorId: interaction.user.id, action: 'delivery.marked', outcome: 'ok', ...(note ? { data: { note } } : {}) },
       );
-      const client = project.client_id ? `<@${project.client_id}>` : 'Client';
+      const client = clientMentions(project);
       await interaction.reply({
         content: [
           `${OWNER_NAME} has marked **${project.name}** as delivered.${note ? `\n> ${note}` : ''}`,

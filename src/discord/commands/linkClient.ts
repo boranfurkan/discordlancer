@@ -3,16 +3,17 @@
 
 import { ChannelType, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { requireProject, UserError, type Command } from '../command.js';
-import { attachClient } from '../joins.js';
+import { isClientMember } from '../../db/projects.js';
+import { addTeamMember, attachClient } from '../joins.js';
 
-const description = "Give a member access to this project as its client";
+const description = "Give a member access to this project as its client, or as one more person on the client's team";
 
 export const linkClient: Command = {
   name: 'link-client',
   description,
   access: 'owner',
   where: 'project',
-  stages: ['created'],
+  stages: ['created', 'joined', 'specs_agreed', 'quote_accepted', 'paid', 'in_development', 'delivered', 'support'],
   definition: new SlashCommandBuilder()
     .setName('link-client')
     .setDescription(description)
@@ -30,8 +31,15 @@ export const linkClient: Command = {
     if (!member) throw new UserError(`<@${user.id}> isn't in this server yet. Send them the invite first.`);
     if (interaction.channel?.type !== ChannelType.GuildText) throw new UserError('Run this in the project channel.');
 
+    if (isClientMember(project, user.id)) throw new UserError(`<@${user.id}> is already on this project.`);
+
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    await attachClient(ctx, interaction.guild, project, interaction.channel, user.id, 'linked', interaction.user.id);
-    await interaction.editReply(`Linked <@${user.id}> as the client of **${project.name}**.`);
+    if (project.stage === 'created') {
+      await attachClient(ctx, interaction.guild, project, interaction.channel, user.id, 'linked', interaction.user.id);
+      await interaction.editReply(`Linked <@${user.id}> as the client of **${project.name}**.`);
+    } else {
+      await addTeamMember(ctx, interaction.guild, project, interaction.channel, user.id, 'linked', interaction.user.id);
+      await interaction.editReply(`Added <@${user.id}> to the client's team on **${project.name}**.`);
+    }
   },
 };

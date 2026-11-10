@@ -5,7 +5,7 @@ import { callLabel, type Call } from '../db/calls.js';
 import type { Agreement, Quote, Spec } from '../db/deals.js';
 import type { EventRecord } from '../db/events.js';
 import type { Payment } from '../db/payments.js';
-import type { Project } from '../db/projects.js';
+import { clientMembers, type Project } from '../db/projects.js';
 import { formatDeadline } from '../domain/deadline.js';
 import { formatUsdc } from '../domain/money.js';
 import { explorerUrl } from '../domain/payment.js';
@@ -46,7 +46,7 @@ export function exportSummary(input: ExportInput): string {
     '## Project',
     `- Stage: ${STAGE_LABEL[project.stage]} (\`${project.stage}\`)`,
     `- Started: ${iso(project.created_at)}`,
-    `- Client Discord ID: ${project.client_id ?? 'none'}`,
+    `- Client Discord IDs: ${clientMembers(project).join(', ') || 'none'}`,
     `- Client GitHub: ${project.client_github ?? 'none'}`,
     `- Client's declared wallet: ${project.client_wallet ?? 'none'}`,
     `- Repo: https://github.com/${project.repo}`,
@@ -150,6 +150,8 @@ const PHRASES: Record<string, (project: string, data: Record<string, unknown>) =
   'project.created': (p) => `set up ${p}`,
   'project.invite_renewed': (p) => `renewed the invite for ${p}`,
   'project.client_linked': (p) => `linked the client of ${p}`,
+  'project.team_invite_created': (p) => `invited more of the client's team to ${p}`,
+  'project.member_linked': (p) => `added a client team member to ${p}`,
   'project.github_added': (p) => `gave the client repo access on ${p}`,
   'spec.created': (p, d) => `wrote specs v${String(d.version ?? '?')} for ${p} with Gemini`,
   'spec.agreed': (p, d) => `agreed specs v${String(d.version ?? '?')} for ${p}`,

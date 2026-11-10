@@ -1,5 +1,7 @@
 // /project: the project card. Specs, quote and payment lines fill in as those phases land.
 
+import { clientMembers } from '../../db/projects.js';
+import { clientMentions } from '../texts.js';
 import { EmbedBuilder, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import type { Project } from '../../db/projects.js';
 import { requireProject, type Command } from '../command.js';
@@ -12,7 +14,7 @@ export function projectCard(project: Project): { title: string; fields: Array<{ 
     fields: [
       { name: 'Stage', value: STAGE_LABEL[project.stage] },
       { name: 'Next', value: NEXT_STEP[project.stage] },
-      { name: 'Client', value: project.client_id ? `<@${project.client_id}>` : 'Not joined yet' },
+      { name: 'Client', value: clientMembers(project).length ? clientMentions(project) : 'Not joined yet' },
       { name: 'Repo', value: `https://github.com/${project.repo}` },
       { name: 'GitHub access', value: project.client_github ?? 'No GitHub account added yet (use /add-github)' },
       { name: 'Started', value: `<t:${Math.floor(project.created_at.getTime() / 1000)}:D>` },

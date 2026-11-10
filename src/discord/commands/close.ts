@@ -2,7 +2,7 @@
 // stays, the client can still read it but no longer write, and history is kept.
 
 import { ChannelType, SlashCommandBuilder } from 'discord.js';
-import { moveStage } from '../../db/projects.js';
+import { clientMembers, moveStage } from '../../db/projects.js';
 import { isClosed, STAGES, type Stage } from '../../domain/stages.js';
 import { makeReadOnly } from '../channels.js';
 import { requireProject, UserError, type Command, type CommandRun } from '../command.js';
@@ -23,8 +23,8 @@ async function close(run: CommandRun, to: 'cancelled' | 'archived'): Promise<voi
     outcome: 'ok',
     ...(reason ? { data: { reason } } : {}),
   });
-  if (project.client_id && interaction.channel?.type === ChannelType.GuildText) {
-    await makeReadOnly(interaction.channel, [project.client_id], `Discordlancer: project ${to}`);
+  if (clientMembers(project).length && interaction.channel?.type === ChannelType.GuildText) {
+    await makeReadOnly(interaction.channel, clientMembers(project), `Discordlancer: project ${to}`);
   }
   // A project closed before its client joined: retire the invite so it can't be used.
   if (project.stage === 'created' && project.invite_code) {

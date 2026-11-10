@@ -14,6 +14,7 @@ import {
   type ButtonInteraction,
   type Guild,
   type Message,
+  type MessageCreateOptions,
   type TextChannel,
   type VoiceChannel,
   type VoiceState,
@@ -21,13 +22,13 @@ import {
 import { callLabel, saveCall, type Call, type Participant } from '../db/calls.js';
 import { latestSpec } from '../db/deals.js';
 import { recordEvent } from '../db/events.js';
-import type { Project } from '../db/projects.js';
+import { clientMembers, isClientMember, type Project } from '../db/projects.js';
 import { log } from '../log.js';
 import { CALL_SUMMARY_PROMPT_VERSION, type CallSummary } from '../prompts/calls.js';
 import { STT_MODEL } from '../services/elevenlabs.js';
 import { GeminiError, SPEC_MODEL } from '../services/gemini.js';
 import { projectScope, safeRemember } from '../services/memory.js';
-import { ensureOwnerChannel, ensureProjectVoice } from '../discord/channels.js';
+import { ensureOwnerChannel, ensureProjectThread, ensureProjectVoice } from '../discord/channels.js';
 import { safeRecord } from '../discord/client.js';
 import { UserError, type BotContext } from '../discord/command.js';
 import { OWNER_NAME } from '../discord/guards.js';
@@ -83,6 +84,12 @@ export async function joinWithDiscord(channel: VoiceChannel): Promise<VoiceLink>
 
 type Consent = 'yes' | 'no';
 
+/** Where call posts go: the project's 📞 Calls thread (a channel in tests). */
+export interface Postable {
+  id: string;
+  send(options: string | MessageCreateOptions): Promise<Message>;
+}
+
 interface Person extends Speaker {
   userId: string;
 }
@@ -91,6 +98,7 @@ interface Recording {
   id: string;
   project: Project;
   text: TextChannel;
+  thread: Postable;
   startedAt: Date;
   endedAt: Date;
   segments: Segment[];
@@ -102,6 +110,7 @@ interface ActiveCall {
   id: string;
   project: Project;
   text: TextChannel;
+  thread: Postable;
   voice: VoiceChannel;
   link: VoiceLink;
   recorder: CallRecorder;
@@ -198,6 +207,8 @@ export interface CallManager {
 export interface CallOptions {
   join?: JoinVoice;
   ensureVoice?: typeof ensureProjectVoice;
+  /** The 📞 Calls thread; tests pass a fake. */
+  callsThread?: (text: TextChannel, memberIds: readonly string[]) => Promise<Postable>;
   now?: () => Date;
   maxMinutes?: number;
   emptyGraceMs?: number;
@@ -206,13 +217,14 @@ export interface CallOptions {
 export function createCallManager(ctx: BotContext, options: CallOptions = {}): CallManager {
   const join = options.join ?? joinWithDiscord;
   const ensureVoice = options.ensureVoice ?? ensureProjectVoice;
+  const callsThread = options.callsThread ?? ((text: TextChannel, memberIds: readonly string[]) => ensureProjectThread(text, 'calls', memberIds));
   const now = options.now ?? (() => new Date());
   const ownerId = ctx.env.DISCORD_OWNER_ID;
   let current: ActiveCall | undefined;
   let failed: Recording | undefined;
   const pending = new Set<Promise<void>>();
 
-  const roleOf = (project: Project, userId: string): Person['role'] => (userId === ownerId ? 'owner' : userId === project.client_id ? 'client' : 'other');
+  const roleOf = (project: Project, userId: string): Person['role'] => (userId === ownerId ? 'owner' : isClientMember(project, userId) ? 'client' : 'other');
 
   async function displayName(guild: Guild, userId: string): Promise<string> {
     if (userId === ownerId) return OWNER_NAME;
@@ -241,13 +253,13 @@ export function createCallManager(ctx: BotContext, options: CallOptions = {}): C
   }
 
   async function processRecording(recording: Recording): Promise<void> {
-    const { project, text } = recording;
+    const { project, text, thread } = recording;
     const base = { actor: 'owner', actorId: ownerId, project: project.id } as const;
     try {
       const recorded = recording.segments.filter((segment) => recording.consent.get(segment.userId) === 'yes');
       const prepared = prepareSegments(recorded, recording.startedAt);
       if (prepared.length === 0) {
-        await text.send({ content: 'The call ended. Nothing was recorded: there was no speech from anyone who agreed to be recorded.', allowedMentions: { parse: [] } });
+        await thread.send({ content: 'The call ended. Nothing was recorded: there was no speech from anyone who agreed to be recorded.', allowedMentions: { parse: [] } });
         await safeRecord(ctx, { ...base, action: 'call.empty', outcome: 'ok', data: { call_id: recording.id } });
         return;
       }
@@ -267,7 +279,7 @@ export function createCallManager(ctx: BotContext, options: CallOptions = {}): C
       texts ??= await transcribeSegments(ctx.gemini, prepared, speakers);
       const transcript = assembleTranscript(prepared, texts, speakers);
       if (!transcript) {
-        await text.send({ content: "The call ended, but no speech could be made out in the recording, so there are no notes.", allowedMentions: { parse: [] } });
+        await thread.send({ content: "The call ended, but no speech could be made out in the recording, so there are no notes.", allowedMentions: { parse: [] } });
         await safeRecord(ctx, { ...base, action: 'call.empty', outcome: 'ok', data: { call_id: recording.id, reason: 'no speech transcribed' } });
         return;
       }
@@ -289,7 +301,7 @@ export function createCallManager(ctx: BotContext, options: CallOptions = {}): C
         { actor: 'owner', actorId: ownerId, action: 'call.recorded', outcome: 'ok', data: { minutes: minutes(recording.startedAt, recording.endedAt), segments: prepared.length, transcriber, model, prompt_version: promptVersion } },
       );
       const clientName = participants.find((person) => person.role === 'client')?.name ?? 'Client';
-      await text.send({
+      await thread.send({
         content: callNotesText(summary, { startedAt: call.started_at, endedAt: call.ended_at, clientName, transcriber }),
         files: [new AttachmentBuilder(Buffer.from(transcriptFile(project.name, call)), { name: `call-${callLabel(call).replace(/[ :]/g, '-')}-transcript.md` })],
         allowedMentions: { parse: [] },
@@ -304,7 +316,7 @@ export function createCallManager(ctx: BotContext, options: CallOptions = {}): C
       failed = recording;
       const known = error instanceof GeminiError || error instanceof UserError;
       log.error('could not process a call', { project: project.name, error });
-      await text
+      await thread
         .send({ content: `The call ended, but it couldn't be transcribed just now. ${OWNER_NAME} has been told and will try again.`, allowedMentions: { parse: [] } })
         .catch(() => undefined);
       await safeRecord(ctx, { ...base, action: 'call.failed', outcome: 'failed', data: { call_id: recording.id, reason: known ? (error as Error).message : 'internal error' } });
@@ -331,15 +343,18 @@ export function createCallManager(ctx: BotContext, options: CallOptions = {}): C
             : `The bot is recording a call for **${current.project.name}** right now. End it with /call stop in that channel first.`,
         );
       }
-      const voice = await ensureVoice(text.guild, project.name, ownerId, project.client_id);
+      const members = clientMembers(project);
+      const voice = await ensureVoice(text.guild, project.name, ownerId, members);
+      const thread = await callsThread(text, [ownerId, ...members]);
       const link = await join(voice);
       const id = crypto.randomUUID().slice(0, 8);
       const people = new Map<string, Person>([[ownerId, { userId: ownerId, name: OWNER_NAME, role: 'owner' }]]);
-      if (project.client_id) people.set(project.client_id, { userId: project.client_id, name: await displayName(text.guild, project.client_id), role: 'client' });
+      for (const memberId of members) people.set(memberId, { userId: memberId, name: await displayName(text.guild, memberId), role: 'client' });
       const call: ActiveCall = {
         id,
         project,
         text,
+        thread,
         voice,
         link,
         recorder: new CallRecorder(link.receiver, { now, onLimit: () => void manager.stop(project.name, 'the recording limit was reached') }),
@@ -353,11 +368,14 @@ export function createCallManager(ctx: BotContext, options: CallOptions = {}): C
       link.onLost(() => void manager.stop(project.name, 'the bot lost its connection to the call'));
       call.timers.max = setTimeout(() => void manager.stop(project.name, `it reached ${options.maxMinutes ?? MAX_CALL_MINUTES} minutes`), (options.maxMinutes ?? MAX_CALL_MINUTES) * 60_000);
       call.timers.max.unref?.();
-      call.message = await text.send({
+      call.message = await thread.send({
         content: consentText(project.name, voice.id, [...people.values()], call.consent),
         components: [consentButtons(id)],
-        allowedMentions: { users: project.client_id ? [project.client_id] : [] },
+        allowedMentions: { users: members },
       });
+      if (thread.id !== text.id) {
+        await text.send({ content: `📞 ${OWNER_NAME} started a call in <#${voice.id}>. Agreeing to be recorded, and the notes afterwards, are in <#${thread.id}>.`, allowedMentions: { parse: [] } }).catch(() => undefined);
+      }
       checkEmpty();
       await safeRecord(ctx, { actor: 'owner', actorId: ownerId, action: 'call.started', outcome: 'ok', project: project.id, data: { call_id: id, voice_channel: voice.id } });
       return voice;
@@ -372,10 +390,10 @@ export function createCallManager(ctx: BotContext, options: CallOptions = {}): C
       const segments = call.recorder.stop();
       call.link.destroy();
       await refreshConsentMessage(call, reason);
-      await call.text.send({ content: `The call has ended (${reason}). Transcribing it now; the notes will appear here.`, allowedMentions: { parse: [] } }).catch(() => undefined);
+      await call.thread.send({ content: `The call has ended (${reason}). Transcribing it now; the notes will appear here.`, allowedMentions: { parse: [] } }).catch(() => undefined);
       await safeRecord(ctx, { actor: 'owner', actorId: ownerId, action: 'call.ended', outcome: 'ok', project: call.project.id, data: { call_id: call.id, reason, turns: segments.length } });
       inBackground(
-        processRecording({ id: call.id, project: call.project, text: call.text, startedAt: call.recorder.startedAt, endedAt: now(), segments, people: call.people, consent: call.consent }),
+        processRecording({ id: call.id, project: call.project, text: call.text, thread: call.thread, startedAt: call.recorder.startedAt, endedAt: now(), segments, people: call.people, consent: call.consent }),
       );
       return true;
     },

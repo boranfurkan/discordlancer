@@ -18,6 +18,7 @@ export const ProjectRow = z.object({
   repo: z.string(),
   invite_code: z.string().optional(),
   client_id: z.string().optional(),
+  client_ids: z.array(z.string()).optional(),
   client_github: z.string().optional(),
   client_wallet: z.string().optional(),
   delivery_marked_at: toDate.optional(),
@@ -29,6 +30,16 @@ export const ProjectRow = z.object({
 });
 
 export type Project = z.infer<typeof ProjectRow>;
+
+/** Everyone on the client's side: the first client, then anyone who joined with a team invite. */
+export function clientMembers(project: Pick<Project, 'client_id' | 'client_ids'>): string[] {
+  return [...new Set([...(project.client_id ? [project.client_id] : []), ...(project.client_ids ?? [])])];
+}
+
+/** Whether this person is on the client's side of the project. Any of them may act for the client. */
+export function isClientMember(project: Pick<Project, 'client_id' | 'client_ids'>, userId: string): boolean {
+  return clientMembers(project).includes(userId);
+}
 
 export function projectId(name: string): RecordId<'project'> {
   return new RecordId('project', name);
@@ -105,6 +116,7 @@ export class StageConflictError extends Error {
 export interface ProjectChanges {
   invite_code?: string;
   client_id?: string;
+  client_ids?: string[];
   client_github?: string;
   client_wallet?: string;
   delivery_marked_at?: Date;
@@ -146,6 +158,17 @@ export async function moveStage(
     }
     throw error;
   }
+}
+
+/** Adds someone to the client's team, with its event, in one transaction. Safe to run twice. */
+export async function addClientMember(db: Surreal, project: Pick<Project, 'id'>, userId: string, event: Omit<EventInput, 'project'>): Promise<void> {
+  await db.query(
+    `BEGIN TRANSACTION;
+     UPDATE ONLY $id SET client_ids = array::union(client_ids ?? [], [$userId]) RETURN NONE;
+     CREATE event CONTENT $event RETURN NONE;
+     COMMIT TRANSACTION;`,
+    { id: project.id, userId, event: eventContent(event, project.id) },
+  );
 }
 
 /** Updates fields without changing the stage, writing `event` in the same transaction. */

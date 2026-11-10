@@ -67,7 +67,9 @@ describe('helpText', () => {
     const text = helpText(COMMANDS, true, 'created');
     expect(text).toContain('**Stage:** Waiting for the client to join');
     expect(text).toContain('/link-client');
-    expect(helpText(COMMANDS, true, 'joined')).not.toContain('/link-client');
+    // Once the client has joined, /link-client adds more of their team; it's gone when the project is closed.
+    expect(helpText(COMMANDS, true, 'joined')).toContain('/link-client');
+    expect(helpText(COMMANDS, true, 'archived')).not.toContain('/link-client');
   });
 
   it('never shows clients owner-only commands, and marks them for the owner', () => {
@@ -92,7 +94,7 @@ describe('matchJoin', () => {
   ];
 
   it('picks the project whose invite was just used up', () => {
-    expect(matchJoin(candidates, new Set(['bbb']), now)).toEqual({ kind: 'one', name: 'alpha' });
+    expect(matchJoin(candidates, new Set(['bbb']), now)).toEqual({ kind: 'one', name: 'alpha', inviteCode: 'aaa' });
   });
 
   it('ignores invites that vanished because they expired', () => {

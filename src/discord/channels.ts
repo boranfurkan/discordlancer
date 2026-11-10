@@ -5,11 +5,13 @@
 import {
   ChannelType,
   PermissionFlagsBits,
+  ThreadAutoArchiveDuration,
   type CategoryChannel,
   type Guild,
   type Invite,
   type OverwriteResolvable,
   type TextChannel,
+  type ThreadChannel,
   type VoiceChannel,
 } from 'discord.js';
 
@@ -26,6 +28,8 @@ const PERSON = [
   PermissionFlagsBits.AttachFiles,
   PermissionFlagsBits.AddReactions,
   PermissionFlagsBits.UseApplicationCommands,
+  // Replies in the project's threads (calls, code changes, progress updates).
+  PermissionFlagsBits.SendMessagesInThreads,
 ];
 
 // Manage Roles is left out on purpose: only an Administrator can grant it in an
@@ -35,6 +39,8 @@ const BOT = [
   PermissionFlagsBits.ManageChannels,
   PermissionFlagsBits.ManageMessages,
   PermissionFlagsBits.CreateInstantInvite,
+  PermissionFlagsBits.CreatePublicThreads,
+  PermissionFlagsBits.ManageThreads,
 ];
 
 function botId(guild: Guild): string {
@@ -104,7 +110,7 @@ const VOICE_PERSON = [
  * The project's private voice channel, named like its text channel: Boran, the bot
  * and the client (once joined) can see it. Made the first time a call starts.
  */
-export async function ensureProjectVoice(guild: Guild, name: string, ownerId: string, clientId?: string): Promise<VoiceChannel> {
+export async function ensureProjectVoice(guild: Guild, name: string, ownerId: string, clientIds: readonly string[] = []): Promise<VoiceChannel> {
   const category = await ensureProjectsCategory(guild, ownerId);
   const channels = await guild.channels.fetch();
   let voice = channels.find(
@@ -121,12 +127,64 @@ export async function ensureProjectVoice(guild: Guild, name: string, ownerId: st
     ],
     reason: `Discordlancer: voice channel for ${name}`,
   });
-  if (clientId && !voice.permissionOverwrites.cache.has(clientId)) {
+  for (const clientId of clientIds) {
+    if (voice.permissionOverwrites.cache.has(clientId)) continue;
     await voice.permissionOverwrites.edit(clientId, Object.fromEntries(VOICE_PERSON.map((flag) => [permissionName(flag), true])), {
       reason: 'Discordlancer: the client can join project calls',
     });
   }
   return voice;
+}
+
+/** Lets someone who joined later into the project's voice channel, if it exists yet. */
+export async function openProjectVoiceTo(guild: Guild, name: string, userId: string): Promise<void> {
+  const channels = await guild.channels.fetch();
+  const voice = channels.find((channel): channel is VoiceChannel => channel?.type === ChannelType.GuildVoice && channel.name === name);
+  await voice?.permissionOverwrites.edit(userId, Object.fromEntries(VOICE_PERSON.map((flag) => [permissionName(flag), true])), {
+    reason: 'Discordlancer: a client team member joined',
+  });
+}
+
+/** Threads in each project channel, so the main chat stays a conversation. */
+export type ThreadKind = 'calls' | 'code' | 'updates';
+export const THREAD_NAMES: Record<ThreadKind, string> = {
+  calls: '📞 Calls',
+  code: '🔧 Code changes',
+  updates: '📈 Progress updates',
+};
+
+async function findThread(channel: TextChannel, name: string): Promise<ThreadChannel | undefined> {
+  const active = await channel.threads.fetchActive();
+  const found = active.threads.find((thread) => thread.parentId === channel.id && thread.name === name);
+  if (found) return found;
+  const archived = await channel.threads.fetchArchived({ type: 'public', limit: 50 });
+  return archived.threads.find((thread) => thread.name === name);
+}
+
+/**
+ * The project's thread for one kind of post, made the first time (or reopened if it
+ * was archived), with everyone on the project added so they are notified.
+ */
+export async function ensureProjectThread(channel: TextChannel, kind: ThreadKind, memberIds: readonly string[]): Promise<ThreadChannel> {
+  const name = THREAD_NAMES[kind];
+  let thread = await findThread(channel, name);
+  if (thread?.archived) await thread.setArchived(false, 'Discordlancer: a new post');
+  thread ??= await channel.threads.create({
+    name,
+    type: ChannelType.PublicThread,
+    autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
+    reason: `Discordlancer: ${name} for ${channel.name}`,
+  });
+  for (const id of memberIds) await thread.members.add(id).catch(() => undefined);
+  return thread;
+}
+
+/** Adds someone who joined later to the project's threads that exist already. */
+export async function addToProjectThreads(channel: TextChannel, userId: string): Promise<void> {
+  for (const name of Object.values(THREAD_NAMES)) {
+    const thread = await findThread(channel, name).catch(() => undefined);
+    await thread?.members.add(userId).catch(() => undefined);
+  }
 }
 
 /** One use, seven days, always a new code, so each invite points at exactly one project. */

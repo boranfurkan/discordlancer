@@ -7,6 +7,7 @@ import { archive, cancel } from './close.js';
 import { confirmDelivery } from './delivery.js';
 import { exportEvidence, report, touches } from './evidence.js';
 import { help } from './help.js';
+import { teamInvite } from './invite.js';
 import { linkClient } from './linkClient.js';
 import { newProject } from './newProject.js';
 import { paid, pay, receipt, startDevelopment } from './pay.js';
@@ -20,6 +21,7 @@ export const COMMANDS: readonly Command[] = [
   help,
   projectInfo,
   newProject,
+  teamInvite,
   linkClient,
   addGithub,
   createSpecs,

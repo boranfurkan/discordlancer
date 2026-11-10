@@ -7,9 +7,9 @@ import type { Guild, TextChannel } from 'discord.js';
 import { callsFor, type Call } from '../db/calls.js';
 import { changeRequestsFor, type ChangeRequest } from '../db/changes.js';
 import { agreedParties, latestQuote, latestSpec, type Quote, type Spec } from '../db/deals.js';
-import { recordEvent, type Actor } from '../db/events.js';
+import { eventsForProject, recordEvent, type Actor } from '../db/events.js';
 import { paymentsFor, type Payment } from '../db/payments.js';
-import type { Project } from '../db/projects.js';
+import { clientMembers, type Project } from '../db/projects.js';
 import { formatDeadline } from '../domain/deadline.js';
 import { formatUsdc } from '../domain/money.js';
 import { log } from '../log.js';
@@ -38,6 +38,7 @@ export interface AnswerContext {
   payments: readonly Payment[];
   changes: readonly ChangeRequest[];
   calls?: readonly Call[];
+  updates?: ReadonlyArray<{ at: Date; summary: string }>;
   memory: string;
   messages: readonly ChatMessage[];
   code?: RepoSnapshot | undefined;
@@ -86,6 +87,7 @@ export function renderAnswerInput(context: AnswerContext): string {
       ? fence('change_requests', changes.map((change) => `- [${change.status}${change.pr_number ? `, pull request #${change.pr_number}` : ''}] ${change.text.slice(0, 300)}`).join('\n'))
       : '',
     context.memory ? fence('memory', context.memory) : '',
+    context.updates?.length ? fence('progress_updates', context.updates.map((update) => `- ${update.at.toISOString().slice(0, 10)}: ${update.summary}`).join('\n')) : '',
     renderCalls(context.calls ?? []),
     trimmed,
     code,
@@ -99,6 +101,7 @@ export function renderAnswerInput(context: AnswerContext): string {
 const SOURCE_LABEL: Record<AnswerOutput['based_on'][number], string> = {
   chat: 'the chat',
   calls: 'the call notes',
+  updates: 'the progress updates',
   spec: 'the spec',
   quote: 'the quote',
   payments: 'the payments',
@@ -129,14 +132,15 @@ export async function answerQuestion(
   question: string,
   ownerNote?: string,
 ): Promise<{ output: AnswerOutput; commit?: string | undefined }> {
-  const [spec, quote, payments, changes, calls, memory, messages, code] = await Promise.all([
+  const [spec, quote, payments, changes, calls, events, memory, messages, code] = await Promise.all([
     latestSpec(ctx.db, project),
     latestQuote(ctx.db, project),
     paymentsFor(ctx.db, project),
     changeRequestsFor(ctx.db, project),
     callsFor(ctx.db, project),
+    eventsForProject(ctx.db, project.id),
     safeRecall(ctx.memory, projectScope(project.name), question),
-    readConversation(channel, project.created_at, { ownerId: ctx.env.DISCORD_OWNER_ID, clientId: project.client_id }, { includeBot: true }),
+    readConversation(channel, project.created_at, { ownerId: ctx.env.DISCORD_OWNER_ID, clientIds: clientMembers(project) }, { includeBot: true }),
     ctx.github.readRepo(project.repo).catch((error: unknown) => {
       log.warn('could not read the repo for an answer', { project: project.name, error });
       return undefined;
@@ -152,6 +156,10 @@ export async function answerQuestion(
     payments,
     changes,
     calls,
+    updates: events
+      .filter((event) => event.action === 'dev.update_posted' && event.outcome === 'ok' && typeof event.data?.summary === 'string')
+      .slice(-10)
+      .map((event) => ({ at: event.at, summary: String(event.data?.summary) })),
     memory,
     messages,
     code,

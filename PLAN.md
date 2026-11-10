@@ -105,7 +105,7 @@ SurrealDB 4 on SurrealDB Cloud (Earth): namespace `freelance`, database `bot`. E
 
 | Table | Holds | Unique by |
 |---|---|---|
-| `project` | Name, Discord channel ID, repo (`owner/name`), invite code, client's Discord ID, GitHub username and declared wallet, stage, the SHA-256 of its Claude Code key, timestamps | Name; channel ID |
+| `project` | Name, Discord channel ID, repo (`owner/name`), invite code, client's Discord ID (the first), the rest of the client's team (`client_ids`), GitHub username and declared wallet, stage, the SHA-256 of its Claude Code key, timestamps | Name; channel ID |
 | `event` | **Append-only log:** time, project, actor (`owner`, `client` or `bot`), actor's Discord ID, action, data, outcome (`ok`, `refused`, `failed`) | |
 | `spec` | Project, version, markdown, what changed, open questions, model, prompt version, how many messages it read | Project + version |
 | `quote` | Project, version, amount (micro-USDC), deadline, spec version, terms | Project + version |
@@ -113,6 +113,7 @@ SurrealDB 4 on SurrealDB Cloud (Earth): namespace `freelance`, database `bot`. E
 | `payment_request` | Project, quote version, amount, reference key, status (`open`, `paid`, `expired`) | Reference |
 | `payment` | Project, request, signature, from wallet, to wallet, amount, slot, block time, verified time | Signature |
 | `change_request` | Project, text, Gemini's triage, status, issue number, PR number | |
+| `invite` | Team invites from `/invite`: code, project, status (`open`, `used`), who used it | Code |
 | `call` | **Append-only:** project, start and end, participants (name, role, whether they agreed to be recorded), AI transcript, AI summary (decisions, action items, open questions), speech seconds, turns, model, prompt versions. Never the audio | |
 
 **Rules:**
@@ -141,6 +142,7 @@ created → joined → specs_agreed → quote_accepted → paid → in_developme
 
 - **Boran (owner):** matched by `DISCORD_OWNER_ID`. Can run every command.
 - **Client:** whoever joined through the project's invite, or was linked with `/link-client`. Sees only their own channel, plus public channels.
+- **The client's team:** a client can be several people (a CEO, a CTO, a marketing lead). Boran runs `/invite` in the project channel for each extra person: a single-use, seven-day invite, kept in the `invite` table so the join is matched to it like the first invite. Whoever joins with it is added to the project's `client_ids`, gets the channel, the voice channel, the threads and the Client role, and is welcomed. **Anyone on the client's team acts for the client** (Boran's choice, 10 Nov): they can chat, `/ask`, join calls (each agrees to recording separately), request changes, and agree specs, accept quotes, pay and confirm delivery; one agreement counts for the whole team. `/link-client` also adds a team member by hand. `client_id` stays the first person, for display.
 - **Bot:** acts on its own for checks, reminders and messages. Its actions aren't touches.
 
 Commands are registered on our server only, so changes appear instantly. Every command is visible to both people. If a client runs an owner-only command, they get a private "only Furkan can do this" reply. Commands work only inside a project channel, except `/new-project` and `/help`.
@@ -151,7 +153,10 @@ Commands are registered on our server only, so changes appear instantly. Every c
 |---|---|---|---|
 | `/help` | Both | 1 | The commands the caller can run at this stage |
 | `/new-project name` | Boran | 2 | Creates the private channel, a single-use invite and a private repo with the same name. Replies privately with the invite link |
-| `/link-client user` | Boran | 2 | Fallback: attaches a member to the project if invite tracking missed them |
+| `/link-client user` | Boran | 2 | Fallback: attaches a member to the project (as its client, or one more of the client's team) if invite tracking missed them |
+| `/invite` | Boran | 11 | An invite for one more person on the client's team (single-use, 7 days) |
+| `/call start \| stop \| retry` | Boran | 10 | Records a call in the project's voice channel, with each person's consent; notes in the 📞 Calls thread |
+| `/sync-docs` | Boran | 10 | Writes the project docs into the repo as a pull request |
 | `/project` | Both | 2 | Project card: stage, spec version, quote, payment, deadline, what's next |
 | `/add-github username` | Both | 2 | Adds the client's GitHub account to the repo with **read-only** access |
 | `/create-specs` | Boran | 4 | Gemini writes spec version N from the whole channel, plus "what changed since N-1" and open questions. Posted as a `.md` file and pinned (the bot needs the Pin Messages permission) |
@@ -252,6 +257,15 @@ While Boran builds a client's app with Claude Code, the session can tell the cli
   - `post_update`: summary, done, next, and optionally what's needed from the client. Posted in the key's own project channel, pinging nobody, ending "Written by Furkan's AI coding assistant (Claude) during his work session". Refused before the client joins, after cancel or archive, over 6 a day, over 1,900 characters, or when it looks like it contains a key. Recorded as `dev.update_posted` (actor `owner`) and remembered in Agent Memory, so `/ask` can answer "how's it going?".
 - **Boran sees every update before it goes out:** Claude Code asks permission for `post_update` and shows the text. Keep it that way rather than allowing it always.
 - **Touches:** the build session is one touch. Updates posted during it don't add more; `/touches` describes them as part of the build session.
+
+## Threads in each project channel
+
+So the main channel stays a conversation, the bot posts three kinds of thing in public threads under it, made the first time they're needed (`ensureProjectThread` in `src/discord/channels.ts`):
+- **📞 Calls:** the consent message, "the call has ended", the call notes and transcripts. When a call starts, the main channel gets one line pointing to the voice channel and the thread.
+- **🔧 Code changes:** Tessl's pull requests, opened, merged or closed.
+- **📈 Progress updates:** Claude Code's updates.
+
+Boran and everyone on the client's team are added to each thread, so they're notified; a team member who joins later is added to the threads that exist. Threads archive after a week without posts and reopen on the next one. People can reply in them (`SendMessagesInThreads`). `/ask` still sees everything: calls and progress updates come from the database, not the chat.
 
 ## Recorded calls
 

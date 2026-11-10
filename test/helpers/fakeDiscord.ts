@@ -97,6 +97,32 @@ export class FakeChannel {
   /** Times the bot showed "is typing". */
   typing = 0;
 
+  /** For a thread: who was added to it, and whether it is archived. */
+  readonly threadMembers = new Set<string>();
+  archived = false;
+
+  get members() {
+    return {
+      add: async (id: string) => {
+        this.threadMembers.add(id);
+      },
+    };
+  }
+
+  async setArchived(archived: boolean) {
+    this.archived = archived;
+  }
+
+  /** discord.js: channel.threads, for threads under this channel. */
+  get threads() {
+    const mine = () => [...this.guild.channelsById.values()].filter((channel) => channel.type === ChannelType.PublicThread && channel.parentId === this.id);
+    return {
+      fetchActive: async () => ({ threads: new Collection(mine().filter((thread) => !thread.archived).map((thread) => [thread.id, thread])) }),
+      fetchArchived: async () => ({ threads: new Collection(mine().filter((thread) => thread.archived).map((thread) => [thread.id, thread])) }),
+      create: async (options: { name: string }) => this.guild.addChannel(options.name, ChannelType.PublicThread, this.id),
+    };
+  }
+
   async sendTyping(): Promise<void> {
     this.typing++;
   }

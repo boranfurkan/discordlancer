@@ -34,7 +34,7 @@ export const LIMITS = {
 export async function readConversation(
   channel: TextChannel,
   since: Date,
-  people: { ownerId: string; clientId?: string | undefined },
+  people: { ownerId: string; clientIds: readonly string[] },
   /** Also include the bot's own posts (for answering questions; specs leave them out). */
   options: { includeBot?: boolean } = {},
 ): Promise<ChatMessage[]> {
@@ -54,7 +54,7 @@ export async function readConversation(
         ? 'bot'
         : message.author.id === people.ownerId
           ? 'owner'
-          : message.author.id === people.clientId
+          : people.clientIds.includes(message.author.id)
             ? 'client'
             : 'other';
       messages.push({

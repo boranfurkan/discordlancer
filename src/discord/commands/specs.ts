@@ -4,14 +4,14 @@ import { AttachmentBuilder, ChannelType, SlashCommandBuilder } from 'discord.js'
 import { callsFor } from '../../db/calls.js';
 import { renderCalls } from '../../voice/callText.js';
 import { addAgreement, agreedParties, latestSpec, saveSpec, VersionTakenError } from '../../db/deals.js';
-import { moveStage } from '../../db/projects.js';
+import { clientMembers, moveStage } from '../../db/projects.js';
 import { log } from '../../log.js';
 import { SPEC_PROMPT_VERSION, SPEC_SCHEMA, SPEC_SYSTEM, SpecOutput } from '../../prompts/specs.js';
 import { GeminiError, SPEC_MODEL } from '../../services/gemini.js';
 import { projectScope, safeRecall, safeRemember } from '../../services/memory.js';
 import { requireProject, UserError, type Command } from '../command.js';
 import { OWNER_NAME } from '../guards.js';
-import { fitMessage } from '../texts.js';
+import { clientMentions, fitMessage } from '../texts.js';
 import { buildSpecInput, readConversation } from '../transcript.js';
 
 const createDescription = 'Write the next spec version from this conversation (AI-drafted)';
@@ -32,7 +32,7 @@ export const createSpecs: Command = {
 
     const messages = await readConversation(interaction.channel, project.created_at, {
       ownerId: ctx.env.DISCORD_OWNER_ID,
-      clientId: project.client_id,
+      clientIds: clientMembers(project),
     });
     if (messages.length === 0) {
       throw new UserError('There are no messages to write specs from yet. Talk about the project here first.');
@@ -125,7 +125,8 @@ export const agreeSpecs: Command = {
       action: 'spec.agreed',
       outcome: 'ok',
     });
-    if (result === 'already') throw new UserError(`You've already agreed to spec v${spec.version}.`);
+    // Anyone on the client's team agrees for the whole team, once.
+    if (result === 'already') throw new UserError(party === 'client' ? `Your side has already agreed to spec v${spec.version}.` : `You've already agreed to spec v${spec.version}.`);
 
     const parties = await agreedParties(ctx.db, project, 'spec', spec.version);
     const stillLatest = (await latestSpec(ctx.db, project))?.version === spec.version;
@@ -140,7 +141,7 @@ export const agreeSpecs: Command = {
       await safeRemember(ctx.memory, projectScope(project.name), `Both sides agreed spec v${spec.version} for ${project.name}:\n${spec.markdown.slice(0, 3_000)}`);
       return;
     }
-    const waitingFor = party === 'owner' ? (project.client_id ? `<@${project.client_id}>` : 'the client') : OWNER_NAME;
+    const waitingFor = party === 'owner' ? (clientMembers(project).length ? clientMentions(project) : 'the client') : OWNER_NAME;
     await interaction.reply(`<@${interaction.user.id}> agreed to **spec v${spec.version}**. Waiting for ${waitingFor}.`);
   },
 };

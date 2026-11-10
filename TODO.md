@@ -244,6 +244,13 @@ Skills: the `tessl__*` skills, `gemini-api-dev`, `surrealdb-agent-memory-docs`.
 - [x] Guardrails tested against the real Gemini: a normal question, a discount request (refused, flagged to Boran) and a prompt injection (refused).
 - [ ] **Live check after deploying:** in a test channel, try `/ask`, a tagged reply and the menu once each.
 
+### Phase 11: Client teams and threads (added 10 Nov)
+
+- [x] `/invite` for each extra person on the client's team; joins matched through the `invite` table; channel, voice, threads and the Client role for each. Anyone on the team acts for the client (Boran's choice). See `PLAN.md`, People and permissions.
+- [x] 📞 Calls, 🔧 Code changes and 📈 Progress updates threads in each project channel. See `PLAN.md`, Threads.
+- [x] Journey test: the client's CTO joins with a team invite, agrees for the team, and is in the Code changes thread.
+- [ ] **Live after deploying:** a progress update through Claude Code makes the 📈 Progress updates thread (Claude can do this alone); a team invite with a real second person when one is available.
+
 ### Phase 10: Calls and project docs (added 10 Nov)
 
 - [x] `/call start | stop | retry`: consent buttons, per-speaker recording, Ogg writer, Gemini transcription and summary, append-only `call` table, notes and transcript in the channel, memory. See `PLAN.md`, Recorded calls.

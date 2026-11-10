@@ -10,7 +10,7 @@ import { changeRequestsFor, type ChangeRequest } from '../db/changes.js';
 import { agreedParties, latestQuote, listSpecs, type Quote, type Spec } from '../db/deals.js';
 import { eventsForProject } from '../db/events.js';
 import { paymentsFor, type Payment } from '../db/payments.js';
-import type { Project } from '../db/projects.js';
+import { clientMembers, type Project } from '../db/projects.js';
 import { formatDeadline } from '../domain/deadline.js';
 import { formatUsdc } from '../domain/money.js';
 import { findSecret } from '../mcp/updates.js';
@@ -186,7 +186,7 @@ export interface DocsResult {
 /** Gathers every source, writes the docs, has them reviewed, and checks the citations. */
 export async function writeDocs(ctx: BotContext, project: Project, channel: TextChannel): Promise<DocsResult> {
   const [messages, specs, quote, payments, changes, calls, events, memory, currentDocs] = await Promise.all([
-    readConversation(channel, project.created_at, { ownerId: ctx.env.DISCORD_OWNER_ID, clientId: project.client_id }),
+    readConversation(channel, project.created_at, { ownerId: ctx.env.DISCORD_OWNER_ID, clientIds: clientMembers(project) }),
     listSpecs(ctx.db, project),
     latestQuote(ctx.db, project),
     paymentsFor(ctx.db, project),

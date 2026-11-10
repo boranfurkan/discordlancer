@@ -1,5 +1,6 @@
 // Words the bot says. Kept together so the tone stays the same everywhere.
 
+import { clientMembers, type Project } from '../db/projects.js';
 import type { Stage } from '../domain/stages.js';
 import { OWNER_NAME } from './guards.js';
 
@@ -29,9 +30,23 @@ export const NEXT_STEP: Record<Stage, string> = {
   archived: 'This project is archived.',
 };
 
+/** Pings everyone on the client's side, or says "Client" if nobody has joined. */
+export function clientMentions(project: Pick<Project, 'client_id' | 'client_ids'>): string {
+  return clientMembers(project).map((id) => `<@${id}>`).join(' ') || 'Client';
+}
+
+/** For someone joining a project their team already has, with a team invite. */
+export function teamWelcomeText(memberId: string, projectName: string): string {
+  return [
+    `Welcome, <@${memberId}>! You've joined **${projectName}** with the rest of your team.`,
+    `Everyone on your side can talk here, ask about the project with /ask, join calls, and agree specs, quotes and the delivery for your team. Earlier messages are above, and call notes, code changes and progress updates have their own threads.`,
+    'Type /help at any time to see what you can do.',
+  ].join('\n');
+}
+
 export function welcomeText(clientId: string): string {
   return [
-    `Welcome, <@${clientId}>! This is your private project channel with ${OWNER_NAME}. Only the two of you and the Discordlancer bot can see it.`,
+    `Welcome, <@${clientId}>! This is your private project channel with ${OWNER_NAME}. Only the people on this project and the Discordlancer bot can see it. Need colleagues here too? Ask ${OWNER_NAME} for an invite for each of them.`,
     '',
     '**How it works**',
     "1. Tell us here what you need. Screenshots, links and files are all welcome.",

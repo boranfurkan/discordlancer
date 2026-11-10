@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { ChangeRequest } from '../db/changes.js';
 import type { Quote, Spec } from '../db/deals.js';
 import type { Payment } from '../db/payments.js';
-import type { Project } from '../db/projects.js';
+import { clientMembers, type Project } from '../db/projects.js';
 import { formatDeadline } from '../domain/deadline.js';
 import { formatUsdc } from '../domain/money.js';
 import type { Stage } from '../domain/stages.js';
@@ -127,7 +127,7 @@ export function renderBrief(input: BriefInput): string {
     '',
     `- Stage: ${STAGE_LABEL[project.stage]} (\`${project.stage}\`)`,
     `- Started: ${project.created_at.toISOString().slice(0, 10)}`,
-    `- Client: ${project.client_id ? 'in the channel' : 'not joined yet'}`,
+    `- Client: ${clientMembers(project).length ? `${clientMembers(project).length} ${clientMembers(project).length === 1 ? 'person' : 'people'} in the channel` : 'not joined yet'}`,
     `- Repo: https://github.com/${project.repo}`,
     quote
       ? `- Quote v${quote.quote.version}: ${formatUsdc(quote.quote.amount_micro)} USDC for spec v${quote.quote.spec_version}, delivery by ${formatDeadline(quote.quote.deadline)}; ${agreement(quote.agreedBy)}.`

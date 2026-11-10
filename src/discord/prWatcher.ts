@@ -4,10 +4,10 @@
 
 import { ChannelType, type Client, type Guild } from 'discord.js';
 import { listChangeRequestsByStatus, updateChangeRequest, type ChangeRequest } from '../db/changes.js';
-import { getProject, type Project } from '../db/projects.js';
+import { clientMembers, getProject, type Project } from '../db/projects.js';
 import { log } from '../log.js';
 import { projectScope, safeRemember } from '../services/memory.js';
-import { ensureOwnerChannel } from './channels.js';
+import { ensureOwnerChannel, ensureProjectThread } from './channels.js';
 import type { BotContext } from './command.js';
 import { OWNER_NAME } from './guards.js';
 
@@ -41,9 +41,15 @@ function titleOf(request: ChangeRequest): string {
   return typeof title === 'string' && title ? title : 'the requested change';
 }
 
-async function post(guild: Guild, project: Project, text: string): Promise<void> {
+/** Into the project's 🔧 Code changes thread, or the channel itself if the thread can't be made. */
+async function post(guild: Guild, ctx: BotContext, project: Project, text: string): Promise<void> {
   const channel = await guild.channels.fetch(project.channel_id).catch(() => null);
-  if (channel?.type === ChannelType.GuildText) await channel.send(text);
+  if (channel?.type !== ChannelType.GuildText) return;
+  const thread = await ensureProjectThread(channel, 'code', [ctx.env.DISCORD_OWNER_ID, ...clientMembers(project)]).catch((error: unknown) => {
+    log.warn('could not open the code changes thread', { project: project.name, error });
+    return undefined;
+  });
+  await (thread ?? channel).send(text);
 }
 
 /** One change request: has its pull request appeared, been merged or been closed? */
@@ -63,7 +69,7 @@ export async function checkChangeRequest(guild: Guild, ctx: BotContext, request:
         data: { pr: pull.number, branch: pull.branch },
       });
       if (!moved) return;
-      await post(guild, project, `Tessl has proposed **${title}** as pull request #${pull.number}: ${pull.url}\n${OWNER_NAME} reviews it before anything is merged.`);
+      await post(guild, ctx, project, `Tessl has proposed **${title}** as pull request #${pull.number}: ${pull.url}\n${OWNER_NAME} reviews it before anything is merged.`);
       const desk = await ensureOwnerChannel(guild, ctx.env.DISCORD_OWNER_ID);
       await desk.send(`Review **${project.name}**: Tessl opened pull request #${pull.number} for "${title}". ${pull.url}`);
       return;
@@ -80,10 +86,10 @@ export async function checkChangeRequest(guild: Guild, ctx: BotContext, request:
       });
       if (!moved) return;
       if (pull.merged) {
-        await post(guild, project, `**${title}** is done: pull request #${pull.number} has been merged.`);
+        await post(guild, ctx, project, `**${title}** is done: pull request #${pull.number} has been merged.`);
         await safeRemember(ctx.memory, projectScope(project.name), `Change for ${project.name} merged: ${title} (pull request #${pull.number}).`);
       } else {
-        await post(guild, project, `The proposed change **${title}** (pull request #${pull.number}) was closed without merging. ${OWNER_NAME} will follow up here.`);
+        await post(guild, ctx, project, `The proposed change **${title}** (pull request #${pull.number}) was closed without merging. ${OWNER_NAME} will follow up here.`);
       }
     }
   } catch (error) {

@@ -36,6 +36,7 @@ const BOT = '123456789012345678';
 const BORAN: Person = { id: '323456789012345678', name: 'Furkan' };
 const CLIENT: Person = { id: '423456789012345678', name: 'Ahmet' };
 const STRANGER: Person = { id: '523456789012345678', name: 'Stranger' };
+const CTO: Person = { id: '623456789012345678', name: 'Zeynep' };
 const PROJECT = 'booking-app';
 
 const BUTTONS = {
@@ -261,6 +262,30 @@ describe('a project from start to finish', () => {
     expect(github.collaborators.map((c) => c.username)).toEqual(['ahmet-dev', 'ahmet-dev2']);
   });
 
+  it("4b. The client's CTO joins with a team invite and gets the same access", async () => {
+    expect(said(await run(CLIENT, channel, 'invite'))).toBe('Only Furkan can do this.');
+    const reply = said(await run(BORAN, channel, 'invite'));
+    expect(reply).toMatch(/Invite for one more person on \*\*booking-app\*\*'s team \(one use, valid 7 days\): https:\/\/discord\.gg\/inv/);
+    const code = /discord\.gg\/(\S+)/.exec(reply)![1]!;
+    guild.useInvite(code, CTO.id);
+    await onMemberAdd({ id: CTO.id, guild, user: { bot: false } } as never, ctx);
+
+    expect(await stage()).toBe('joined'); // unchanged
+    const project = (await getProjectByName(db, PROJECT))!;
+    expect(project.client_id).toBe(CLIENT.id);
+    expect(project.client_ids).toEqual([CTO.id]);
+    expect(channel.overwrites.get(CTO.id)).toMatchObject({ ViewChannel: true, SendMessages: true, SendMessagesInThreads: true });
+    expect(channel.botText().at(-1)).toContain(`Welcome, <@${CTO.id}>! You've joined **booking-app** with the rest of your team.`);
+    expect(guild.roleGrants.at(-1)).toEqual({ user: CTO.id, role: 'role-client' });
+    const [invites] = await db.query<[Array<{ status: string; used_by: string }>]>('SELECT status, used_by FROM invite');
+    expect(invites).toEqual([{ status: 'used', used_by: CTO.id }]);
+
+    // The CTO is on the client's side for commands, and the project card lists both.
+    const card = (await run(CTO, channel, 'project')).replies[0]!;
+    expect(card.embeds[0]?.fields?.find((f) => f.name === 'Client')?.value).toBe(`<@${CLIENT.id}> <@${CTO.id}>`);
+    expect(said(await run(STRANGER, channel, 'project'))).toBe("This isn't your project channel.");
+  });
+
   it('5. Commands at the wrong stage are refused in plain words', async () => {
     expect(said(await run(CLIENT, channel, 'pay'))).toContain("That can't be done at this stage (Talking about the project)");
     expect(said(await run(CLIENT, channel, 'agree-specs'))).toContain('There are no specs yet');
@@ -284,7 +309,7 @@ describe('a project from start to finish', () => {
   it('7. Both agree the specs; the stage moves only when both have', async () => {
     expect(said(await run(CLIENT, channel, 'agree-specs'))).toContain('Waiting for Furkan');
     expect(await stage()).toBe('joined');
-    expect(said(await run(CLIENT, channel, 'agree-specs'))).toContain("You've already agreed to spec v1");
+    expect(said(await run(CTO, channel, 'agree-specs'))).toContain('Your side has already agreed to spec v1'); // one agreement for the whole team
     expect(said(await run(BORAN, channel, 'agree-specs'))).toContain('Both sides agreed to **spec v1**');
     expect(await stage()).toBe('specs_agreed');
   });
@@ -479,18 +504,25 @@ describe('a project from start to finish', () => {
     expect(channel.botText().at(-1)).not.toContain('pull request #7');
 
     github.pulls.set(1, { number: 7, url: 'https://github.com/boranfurkan/booking-app/pull/7', state: 'open', merged: false, branch: 'tessl/issue-1' });
+    const mainChat = channel.botText().length;
     await check();
-    expect(channel.botText().at(-1)).toContain('Tessl has proposed **Make the Book button green** as pull request #7');
-    expect(channel.botText().at(-1)).toContain('Furkan reviews it before anything is merged');
+    const code = guild.channelNamed('🔧 Code changes');
+    expect(code.parentId).toBe(channel.id);
+    expect([...code.threadMembers]).toEqual([BORAN.id, CLIENT.id, CTO.id]);
+    expect(code.botText().at(-1)).toContain('Tessl has proposed **Make the Book button green** as pull request #7');
+    expect(code.botText().at(-1)).toContain('Furkan reviews it before anything is merged');
+    expect(channel.botText()).toHaveLength(mainChat); // the main chat stays a conversation
     expect(guild.channelNamed('owner-desk').botText().at(-1)).toContain('Review **booking-app**: Tessl opened pull request #7');
     expect(await getChangeRequest(db, changeKey)).toMatchObject({ status: 'pr_open', pr_number: 7 });
 
     await check(); // still open: nothing new is posted
-    const posted = channel.botText().length;
+    const posted = code.botText().length;
     github.pulls.set(1, { ...github.pulls.get(1)!, state: 'closed', merged: true });
+    code.archived = true; // a week went by: Discord archived the thread
     await check();
-    expect(channel.botText()).toHaveLength(posted + 1);
-    expect(channel.botText().at(-1)).toContain('**Make the Book button green** is done: pull request #7 has been merged');
+    expect(code.archived).toBe(false);
+    expect(code.botText()).toHaveLength(posted + 1);
+    expect(code.botText().at(-1)).toContain('**Make the Book button green** is done: pull request #7 has been merged');
     expect((await getChangeRequest(db, changeKey))?.status).toBe('merged');
     expect(remembered.some((text) => text.includes('merged: Make the Book button green'))).toBe(true);
   });
@@ -524,6 +556,8 @@ describe('a project from start to finish', () => {
     for (const step of [
       'project.created',
       'project.client_joined',
+      'project.team_invite_created',
+      'project.member_joined',
       'spec.created',
       'specs.agreed_by_both',
       'quote.created',

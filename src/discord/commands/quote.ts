@@ -8,7 +8,7 @@ import { DeadlineError, formatDeadline, isAfterFreeze, parseDeadline } from '../
 import { formatUsdc, MoneyError, parseUsdc } from '../../domain/money.js';
 import { requireProject, UserError, type Command } from '../command.js';
 import { OWNER_NAME } from '../guards.js';
-import { quoteTerms } from '../texts.js';
+import { clientMentions, quoteTerms } from '../texts.js';
 import { projectScope, safeRemember } from '../../services/memory.js';
 
 const quoteDescription = 'Post a quote for the agreed spec, in USDC';
@@ -60,7 +60,7 @@ export const quote: Command = {
       throw error;
     }
 
-    const client = project.client_id ? `<@${project.client_id}>` : 'Client';
+    const client = clientMentions(project);
     const lines = [
       `**Quote v${version}** for **${project.name}** (spec v${spec.version})`,
       `- Price: **${amount} USDC**, paid on Solana`,
@@ -111,7 +111,8 @@ export const acceptQuote: Command = {
       action: 'quote.accepted',
       outcome: 'ok',
     });
-    if (result === 'already') throw new UserError(`You've already accepted quote v${current.version}.`);
+    // Anyone on the client's team accepts for the whole team, once.
+    if (result === 'already') throw new UserError(`Your side has already accepted quote v${current.version}.`);
 
     const parties = await agreedParties(ctx.db, project, 'quote', current.version);
     const stillLatest = (await latestQuote(ctx.db, project))?.version === current.version;

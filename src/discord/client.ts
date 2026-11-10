@@ -11,7 +11,7 @@ import {
   type Interaction,
 } from 'discord.js';
 import { recordEvent, type EventInput } from '../db/events.js';
-import { getProjectByChannel, StageConflictError, type Project } from '../db/projects.js';
+import { isClientMember, getProjectByChannel, StageConflictError, type Project } from '../db/projects.js';
 import { log } from '../log.js';
 import { UserError, type BotContext, type Command } from './command.js';
 import { actorFor, checkAccess } from './guards.js';
@@ -112,13 +112,13 @@ export function checkGate(
   command: Pick<Command, 'access' | 'where' | 'stages'>,
   userId: string,
   ownerId: string,
-  project: Pick<Project, 'client_id' | 'stage'> | undefined,
+  project: Pick<Project, 'client_id' | 'client_ids' | 'stage'> | undefined,
 ): Gate {
   const access = checkAccess(command, userId, ownerId);
   if (!access.ok) return { ok: false, reason: 'owner only', reply: access.reply };
   if (command.where === 'project') {
     if (!project) return { ok: false, reason: 'not a project channel', reply: 'This only works in a project channel.' };
-    if (userId !== ownerId && userId !== project.client_id) {
+    if (userId !== ownerId && !isClientMember(project, userId)) {
       return { ok: false, reason: 'not their project', reply: "This isn't your project channel." };
     }
   }

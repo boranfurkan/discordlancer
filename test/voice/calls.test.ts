@@ -109,7 +109,9 @@ function manager(fake: FakeVoice, members = [{ id: OWNER.id, bot: false }], extr
 }
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
-const consentId = (answer: 'yes' | 'no') => text.history.find((message) => message.customIds.length)!.customIds.find((id) => id.includes(`:${answer}:`))!;
+/** The project's 📞 Calls thread, where consent, status and notes are posted. */
+const callsThread = () => guild.channelNamed('📞 Calls');
+const consentId = (answer: 'yes' | 'no') => callsThread().history.find((message) => message.customIds.length)!.customIds.find((id) => id.includes(`:${answer}:`))!;
 
 beforeAll(async () => {
   db = await memoryDb();
@@ -126,6 +128,7 @@ afterAll(async () => {
 });
 beforeEach(() => {
   text.history.length = 0;
+  for (const channel of guild.channelsById.values()) if (channel.type === ChannelType.PublicThread) channel.history.length = 0;
   remembered.length = 0;
   geminiCalls.length = 0;
   geminiFails = false;
@@ -137,8 +140,12 @@ describe('a recorded call', () => {
     const calls = manager(fake);
     await calls.start(project, text as never);
     expect(calls.activeProject()).toBe('alpha');
-    expect(text.history[0]!.content).toContain('**Only people who press "Record me" are recorded.**');
-    expect(text.history[0]!.content).toContain(`<@${CLIENT.id}>: ⏳`);
+    const thread = callsThread();
+    expect(thread.parentId).toBe(text.id);
+    expect([...thread.threadMembers]).toEqual([OWNER.id, CLIENT.id]);
+    expect(thread.history[0]!.content).toContain('**Only people who press "Record me" are recorded.**');
+    expect(thread.history[0]!.content).toContain(`<@${CLIENT.id}>: ⏳`);
+    expect(text.botText()).toEqual([`📞 Furkan started a call in <#voice-1>. Agreeing to be recorded, and the notes afterwards, are in <#${thread.id}>.`]);
 
     fake.talk(OWNER.id, 2);
     fake.talk(CLIENT.id, 3); // before agreeing: never subscribed to
@@ -157,11 +164,12 @@ describe('a recorded call', () => {
     expect(await calls.stop('alpha', 'Furkan ended it')).toBe(true);
     expect(fake.destroyed).toBe(true);
     expect(calls.activeProject()).toBeUndefined();
-    expect(text.history[0]!.content).toContain('The call has ended (Furkan ended it).');
-    expect(text.history[0]!.customIds).toEqual([]);
+    expect(thread.history[0]!.content).toContain('The call has ended (Furkan ended it).');
+    expect(thread.history[0]!.customIds).toEqual([]);
     await calls.idle();
 
-    const notes = text.history.at(-1)!;
+    const notes = thread.history.at(-1)!;
+    expect(text.botText()).toHaveLength(1); // the main channel only got the one line
     expect(notes.content).toContain('📝 **Call notes**');
     expect(notes.content).toContain('**Decisions**\n- Use Stripe for deposits');
     expect(notes.content).toContain('Client: Send the logo by Friday'); // the fake server has no display names
@@ -192,7 +200,7 @@ describe('a recorded call', () => {
     fake.talk(OWNER.id, 2);
     await calls.stop('alpha', 'test');
     await calls.idle();
-    expect(text.botText().at(-1)).toContain('Nothing was recorded');
+    expect(callsThread().botText().at(-1)).toContain('Nothing was recorded');
     expect(geminiCalls).toEqual([]);
   });
 
@@ -204,7 +212,7 @@ describe('a recorded call', () => {
     geminiFails = true;
     await calls.stop('alpha', 'test');
     await calls.idle();
-    expect(text.botText().at(-1)).toContain("couldn't be transcribed just now");
+    expect(callsThread().botText().at(-1)).toContain("couldn't be transcribed just now");
     expect(guild.channelNamed('owner-desk').botText().at(-1)).toContain('/call retry');
     geminiFails = false;
     const before = (await callsFor(db, project)).length;
@@ -221,7 +229,7 @@ describe('a recorded call', () => {
     await expect(calls.start(project, text as never)).rejects.toThrow('already being recorded here');
     await new Promise((resolve) => setTimeout(resolve, 60));
     expect(calls.activeProject()).toBeUndefined();
-    expect(text.history[0]!.content).toContain('everyone left the voice channel');
+    expect(callsThread().history[0]!.content).toContain('everyone left the voice channel');
     await calls.idle();
   });
 });
@@ -261,7 +269,7 @@ describe('a call transcribed by ElevenLabs', () => {
     expect(files).toHaveLength(2);
     expect(files.every((file) => file.subarray(0, 4).toString() === 'OggS')).toBe(true);
     expect(geminiCalls).toEqual(['summary']); // no Gemini transcription
-    expect(text.history.at(-1)!.content).toContain('transcribed by ElevenLabs, summarised by Gemini');
+    expect(callsThread().history.at(-1)!.content).toContain('transcribed by ElevenLabs, summarised by Gemini');
     const saved = (await callsFor(db, project)).at(-1)!;
     expect(saved.model).toMatch(/^elevenlabs\/scribe_v2 \+ /);
     expect(saved.transcript).toContain('Speaker1 here.');
@@ -278,7 +286,7 @@ describe('a call transcribed by ElevenLabs', () => {
     await calls.idle();
     expect(geminiCalls).toEqual(['transcribe', 'summary']);
     expect(guild.channelNamed('owner-desk').botText().at(-1)).toContain("ElevenLabs couldn't transcribe the call");
-    expect(text.history.at(-1)!.content).toContain('transcribed by Gemini');
+    expect(callsThread().history.at(-1)!.content).toContain('transcribed by Gemini');
   });
 });
 

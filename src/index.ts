@@ -12,6 +12,8 @@ import { onOwnerMention } from './discord/ownerAnswer.js';
 import { CONSENT_PREFIX, onCallConsent } from './discord/commands/call.js';
 import type { BotContext } from './discord/command.js';
 import { createCallManager } from './voice/calls.js';
+import { ensureProjectThread } from './discord/channels.js';
+import { clientMembers } from './db/projects.js';
 import { createElevenLabs } from './services/elevenlabs.js';
 import { createGemini } from './services/gemini.js';
 import { createGitHub } from './services/github.js';
@@ -67,12 +69,13 @@ async function main(): Promise<void> {
     db,
     memory: ctx.memory,
     ownerId: env.DISCORD_OWNER_ID,
-    async post(channelId, content) {
-      const channel = await client.channels.fetch(channelId);
+    async post(project, content) {
+      const channel = await client.channels.fetch(project.channel_id);
       if (channel?.type !== ChannelType.GuildText || channel.guildId !== env.DISCORD_GUILD_ID) {
-        throw new Error(`project channel ${channelId} not found`);
+        throw new Error(`project channel ${project.channel_id} not found`);
       }
-      const message = await channel.send({ content, allowedMentions: { parse: [] } });
+      const thread = await ensureProjectThread(channel, 'updates', [env.DISCORD_OWNER_ID, ...clientMembers(project)]);
+      const message = await thread.send({ content, allowedMentions: { parse: [] } });
       return { url: message.url };
     },
   });

@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 
-export const ANSWER_PROMPT_VERSION = 'answer-v2';
+export const ANSWER_PROMPT_VERSION = 'answer-v3';
 
 export const ANSWER_SYSTEM = `You are the project assistant in a private Discord channel between a freelance developer, Furkan, and one client. You answer a question about this one project, using only the context you are given.
 
@@ -12,6 +12,7 @@ The context:
 - <spec>: the latest written spec, and whether both sides have agreed it.
 - <change_requests>: changes asked for after delivery, and where each stands.
 - <memory>: facts remembered from earlier in the project.
+- <progress_updates>: what Furkan's AI coding assistant reported to the client about the work, with dates. They describe the work as it was then.
 - <calls>: recorded voice calls between Furkan and the client: an AI summary and the AI transcript of each. Transcripts can mishear words; where a call and the written spec or chat disagree, the newer one usually wins, but anything about money, deadlines or scope needs Furkan.
 - <conversation>: the channel's messages, oldest first. Messages from "Bot" are the bot's own earlier posts, some of them AI answers, which may be wrong. Where they disagree, the spec, the quote and Furkan's own messages win.
 - <code>: some files from the project's repository at one commit. You have read them, not run them.
@@ -27,7 +28,7 @@ Rules:
 - Answer the question that was asked, in the language it was asked in. Keep it short: a few sentences or a short list. Write plainly for a non-technical reader unless the question is technical. Use Discord markdown sparingly.
 - "owner_note" tells Furkan, in one or two sentences, what needs him (what to confirm or decide). Leave it empty when needs_owner is false.`;
 
-export const ANSWER_SOURCES = ['chat', 'calls', 'spec', 'quote', 'payments', 'changes', 'memory', 'code'] as const;
+export const ANSWER_SOURCES = ['chat', 'calls', 'updates', 'spec', 'quote', 'payments', 'changes', 'memory', 'code'] as const;
 
 export const AnswerOutput = z.object({
   answer: z.string().min(1).max(1_500),

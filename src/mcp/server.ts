@@ -41,8 +41,8 @@ export interface McpDeps {
   db: Surreal;
   memory: MemoryApi;
   ownerId: string;
-  /** Posts in a project channel without pinging anyone; returns the message link. */
-  post(channelId: string, content: string): Promise<{ url: string }>;
+  /** Posts in the project's 📈 Progress updates thread without pinging anyone; returns the message link. */
+  post(project: Project, content: string): Promise<{ url: string }>;
   now?: () => Date;
 }
 
@@ -151,7 +151,7 @@ async function postUpdate(deps: McpDeps, project: Project, args: unknown, now: D
     return text(`The update wasn't posted: this project already had ${UPDATES_PER_DAY} updates today. Save it for tomorrow.`, true);
   }
 
-  const { url } = await deps.post(project.channel_id, message);
+  const { url } = await deps.post(project, message);
   try {
     await recordEvent(deps.db, {
       actor: 'owner',
@@ -173,7 +173,7 @@ async function postUpdate(deps: McpDeps, project: Project, args: unknown, now: D
   }
   // Memory can take a while; the update is already posted, so don't keep the session waiting.
   void safeRemember(deps.memory, projectScope(project.name), memoryLine(parsed.data, now));
-  return text(`Posted in the client's channel: ${url}\nUpdates left today: ${Math.max(0, UPDATES_PER_DAY - today - 1)}.`);
+  return text(`Posted in the client's channel (its Progress updates thread): ${url}\nUpdates left today: ${Math.max(0, UPDATES_PER_DAY - today - 1)}.`);
 }
 
 async function callTool(deps: McpDeps, project: Project, params: Record<string, unknown>): Promise<ToolResult> {

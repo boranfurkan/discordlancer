@@ -13,6 +13,8 @@ DEFINE FIELD OVERWRITE channel_id ON project TYPE string;
 DEFINE FIELD OVERWRITE repo ON project TYPE string;
 DEFINE FIELD OVERWRITE invite_code ON project TYPE option<string>;
 DEFINE FIELD OVERWRITE client_id ON project TYPE option<string>;
+-- Everyone on the client's side who joined after the first (a CEO, a CTO, ...). client_id is the first.
+DEFINE FIELD OVERWRITE client_ids ON project TYPE array<string> DEFAULT [];
 DEFINE FIELD OVERWRITE client_github ON project TYPE option<string>;
 DEFINE FIELD OVERWRITE client_wallet ON project TYPE option<string>;
 DEFINE FIELD OVERWRITE delivery_marked_at ON project TYPE option<datetime>;
@@ -157,3 +159,16 @@ DEFINE INDEX OVERWRITE call_project ON call FIELDS project, started_at;
 DEFINE EVENT OVERWRITE append_only ON call WHEN $event IN ["UPDATE", "DELETE"] THEN {
   THROW "call records are append-only";
 };
+
+-- Team invites -----------------------------------------------------------------
+-- Extra single-use invites for the rest of a client's team (/invite). A join is
+-- matched to the invite that has just disappeared, like the project's first invite.
+
+DEFINE TABLE OVERWRITE invite SCHEMAFULL;
+DEFINE FIELD OVERWRITE code ON invite TYPE string;
+DEFINE FIELD OVERWRITE project ON invite TYPE record<project>;
+DEFINE FIELD OVERWRITE status ON invite TYPE string ASSERT $value IN ["open", "used"];
+DEFINE FIELD OVERWRITE used_by ON invite TYPE option<string>;
+DEFINE FIELD OVERWRITE created_at ON invite TYPE datetime DEFAULT time::now() READONLY;
+DEFINE FIELD OVERWRITE updated_at ON invite TYPE datetime VALUE time::now();
+DEFINE INDEX OVERWRITE invite_code ON invite FIELDS code UNIQUE;

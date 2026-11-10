@@ -60,9 +60,9 @@ beforeAll(async () => {
     db,
     memory,
     ownerId: OWNER_ID,
-    async post(channelId, content) {
-      posted.push({ channelId, content });
-      return { url: `https://discord.com/channels/g/${channelId}/${posted.length}` };
+    async post(project, content) {
+      posted.push({ channelId: project.channel_id, content });
+      return { url: `https://discord.com/channels/g/${project.channel_id}/${posted.length}` };
     },
   });
   const server = startHealthServer(0, () => true, { [MCP_PATH]: () => handler });
@@ -189,7 +189,7 @@ describe('post_update', () => {
   it("posts in the key's own channel, marked as AI, and records and remembers it", async () => {
     const result = await tool(keys.alpha, 'post_update', update);
     expect(result.isError).toBeUndefined();
-    expect(result.content[0]!.text).toContain('Posted in the client\'s channel: https://discord.com/channels/g/channel-alpha/1');
+    expect(result.content[0]!.text).toContain("Posted in the client's channel (its Progress updates thread): https://discord.com/channels/g/channel-alpha/1");
     expect(posted).toHaveLength(1);
     expect(posted[0]!.channelId).toBe('channel-alpha');
     expect(posted[0]!.content).toContain('**Progress update**\nThe booking form works end to end now.');
