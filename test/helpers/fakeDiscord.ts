@@ -87,10 +87,15 @@ export class FakeChannel {
     };
   }
 
+  /** The `type` each overwrite edit gave (member 1, role 0), like discord.js needs for uncached ids. */
+  readonly overwriteTypes = new Map<string, number | undefined>();
+
   get permissionOverwrites() {
     return {
-      edit: async (id: string, permissions: Record<string, boolean>) => {
+      cache: new Map<string, unknown>(),
+      edit: async (id: string, permissions: Record<string, boolean>, options?: { type?: number }) => {
         this.overwrites.set(id, { ...this.overwrites.get(id), ...permissions });
+        this.overwriteTypes.set(id, options?.type);
       },
     };
   }
@@ -190,6 +195,8 @@ export class FakeGuild {
   readonly liveInvites = new Set<string>();
   readonly roleGrants: Array<{ user: string; role: string }> = [];
   readonly memberIds = new Set<string>();
+  /** Every permission overwrite given when the bot created a channel. */
+  readonly createdOverwrites: Array<{ id: string; type?: number }> = [];
 
   constructor(
     readonly id: string,
@@ -228,8 +235,10 @@ export class FakeGuild {
   get channels() {
     return {
       fetch: async (id?: string) => (id ? (this.channelsById.get(id) ?? null) : new Collection([...this.channelsById])),
-      create: async (options: { name: string; type: ChannelType; parent?: string; topic?: string }) =>
-        this.addChannel(options.name, options.type, options.parent ?? null, options.topic),
+      create: async (options: { name: string; type: ChannelType; parent?: string; topic?: string; permissionOverwrites?: Array<{ id: string; type?: number }> }) => {
+        this.createdOverwrites.push(...(options.permissionOverwrites ?? []));
+        return this.addChannel(options.name, options.type, options.parent ?? null, options.topic);
+      },
     };
   }
 

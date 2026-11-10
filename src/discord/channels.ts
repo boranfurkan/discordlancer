@@ -4,6 +4,7 @@
 
 import {
   ChannelType,
+  OverwriteType,
   PermissionFlagsBits,
   ThreadAutoArchiveDuration,
   type CategoryChannel,
@@ -51,9 +52,11 @@ function botId(guild: Guild): string {
 
 function privateOverwrites(guild: Guild, ownerId: string): OverwriteResolvable[] {
   return [
-    { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
-    { id: botId(guild), allow: BOT },
-    { id: ownerId, allow: PERSON },
+    // The type is given, not looked up: discord.js can only look up people it has cached,
+    // and right after a restart nobody is (seen live on 10 Nov, creating #owner-guide).
+    { id: guild.roles.everyone.id, type: OverwriteType.Role, deny: [PermissionFlagsBits.ViewChannel] },
+    { id: botId(guild), type: OverwriteType.Member, allow: BOT },
+    { id: ownerId, type: OverwriteType.Member, allow: PERSON },
   ];
 }
 
@@ -128,9 +131,9 @@ export async function ensureProjectVoice(guild: Guild, name: string, ownerId: st
     type: ChannelType.GuildVoice,
     parent: category.id,
     permissionOverwrites: [
-      { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
-      { id: botId(guild), allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak] },
-      { id: ownerId, allow: VOICE_PERSON },
+      { id: guild.roles.everyone.id, type: OverwriteType.Role, deny: [PermissionFlagsBits.ViewChannel] },
+      { id: botId(guild), type: OverwriteType.Member, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak] },
+      { id: ownerId, type: OverwriteType.Member, allow: VOICE_PERSON },
     ],
     reason: `Discordlancer: voice channel for ${name}`,
   });
@@ -138,6 +141,7 @@ export async function ensureProjectVoice(guild: Guild, name: string, ownerId: st
     if (voice.permissionOverwrites.cache.has(clientId)) continue;
     await voice.permissionOverwrites.edit(clientId, Object.fromEntries(VOICE_PERSON.map((flag) => [permissionName(flag), true])), {
       reason: 'Discordlancer: the client can join project calls',
+      type: OverwriteType.Member,
     });
   }
   return voice;
@@ -149,6 +153,7 @@ export async function openProjectVoiceTo(guild: Guild, name: string, userId: str
   const voice = channels.find((channel): channel is VoiceChannel => channel?.type === ChannelType.GuildVoice && channel.name === name);
   await voice?.permissionOverwrites.edit(userId, Object.fromEntries(VOICE_PERSON.map((flag) => [permissionName(flag), true])), {
     reason: 'Discordlancer: a client team member joined',
+    type: OverwriteType.Member,
   });
 }
 
@@ -208,7 +213,7 @@ export async function grantClient(channel: TextChannel, userId: string): Promise
   await channel.permissionOverwrites.edit(
     userId,
     Object.fromEntries(PERSON.map((flag) => [permissionName(flag), true])),
-    { reason: 'Discordlancer: client joined their project' },
+    { reason: 'Discordlancer: client joined their project', type: OverwriteType.Member },
   );
 }
 
@@ -218,7 +223,7 @@ export async function makeReadOnly(channel: TextChannel, userIds: readonly strin
     await channel.permissionOverwrites.edit(
       userId,
       { SendMessages: false, AddReactions: false, UseApplicationCommands: false },
-      { reason },
+      { reason, type: OverwriteType.Member },
     );
   }
 }

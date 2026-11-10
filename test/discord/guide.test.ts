@@ -42,3 +42,23 @@ describe('owner guide', () => {
     expect(channel.history[0]!.id).toBe(ids[0]); // edited, not reposted
   });
 });
+
+describe('permission overwrites', () => {
+  it('always say whether they are for a member or a role, so nobody needs to be cached', async () => {
+    const { OverwriteType } = await import('discord.js');
+    const { ensureProjectChannel, ensureProjectVoice, grantClient, makeReadOnly, openProjectVoiceTo } = await import('../../src/discord/channels.js');
+    const guild = new FakeGuild('g2', 'bot-2');
+    const text = await ensureProjectChannel(guild as never, 'alpha', 'owner-1');
+    await ensureProjectVoice(guild as never, 'alpha', 'owner-1', ['client-1']);
+    await grantClient(text, 'client-2');
+    await openProjectVoiceTo(guild as never, 'alpha', 'client-3');
+    await makeReadOnly(text, ['client-2'], 'test');
+    expect(guild.createdOverwrites.length).toBeGreaterThan(0);
+    for (const overwrite of guild.createdOverwrites) {
+      expect(overwrite.type, overwrite.id).toBe(overwrite.id === 'g2' ? OverwriteType.Role : OverwriteType.Member);
+    }
+    const edited = [...guild.channelsById.values()].flatMap((channel) => [...channel.overwriteTypes.values()]);
+    expect(edited.length).toBeGreaterThan(0);
+    expect(edited.every((type) => type === OverwriteType.Member)).toBe(true);
+  });
+});
