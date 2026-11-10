@@ -248,7 +248,9 @@ Skills: the `tessl__*` skills, `gemini-api-dev`, `surrealdb-agent-memory-docs`.
 
 - [x] Shared files and links read once when posted, into append-only `file_note`s; 📎 Files thread; `/read-files`; notes feed specs, `/ask`, docs (`files.md`) and Claude Code's brief. See `PLAN.md`, Shared files and links.
 - [x] Real check: a PDF, a Word file and observv.com read by the real Gemini.
-- [ ] **Live check after deploying:** in a test channel, post a PDF, a screenshot, a voice note and a link; check 👀/✅, the 📎 Files thread, and a reply under a `.fig` file.
+- [x] **Live on Replit (10 Nov), test project `dl-test-files`:** a PDF, a screenshot and a Word file each got 👀 then ✅ and good notes in 📎 Files; a `.fig` file and a Figma link got the right replies; a Wikipedia link was read; `/read-files` found nothing left; `/ask` answered from the files; `/review-repo` read 108 files of a public repo and opened a pull request with `docs/references/sindresorhus-ky.md`. Fixed after: background pages no longer list "no requirements" as a requirement (`files-v2`). Reset afterwards by Boran (only that project's records; backup in `backups/`); the append-only guards were confirmed in the schema.
+- [ ] Not tried live yet: a voice note and a short video.
+- [ ] **Boran:** delete the test repo `boranfurkan/dl-test-files`.
 - [x] Preview links: open pull requests' previews (Vercel, Netlify, Cloudflare Pages) posted in 🔧, held back while behind a sign-in. See `PLAN.md`, Preview links.
 - [ ] **Boran, per project on Vercel:** import the repo once, and turn off Vercel Authentication (Settings → Deployment Protection) so the client can open previews.
 - [x] Deposits: `/quote … deposit:<percent>`; `/pay` asks for the deposit, then the balance; the balance is due before the client confirms delivery; `/invoice` re-issues after each payment. See `PLAN.md`, Payment.
