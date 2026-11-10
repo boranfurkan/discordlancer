@@ -116,6 +116,7 @@ SurrealDB 4 on SurrealDB Cloud (Earth): namespace `freelance`, database `bot`. E
 | `issued_invoice` | **Append-only:** invoice number (`DL-2026-0001`, one sequence), project, billed to, amount, quote and spec versions, payment signatures, note, the invoice it replaces | Number; sequence |
 | `invite` | Team invites from `/invite`: code, project, status (`open`, `used`), who used it | Code |
 | `call` | **Append-only:** project, start and end, participants (name, role, whether they agreed to be recorded), AI transcript, AI summary (decisions, action items, open questions), speech seconds, turns, model, prompt versions. Never the audio | |
+| `file_note` | **Append-only:** one per file or link shared in a project channel: who shared it and when, the message, name, kind, size, SHA-256, and either AI notes (title, summary, details, requirements, open questions, model, prompt version) or why it wasn't read. Never the file itself | Project + source (attachment ID, or message + link hash) |
 
 **Rules:**
 - **Money is stored as integers in micro-USDC.** USDC has 6 decimals, so 250 USDC is `250000000`. Never use floats for money.
@@ -280,8 +281,9 @@ Two guides, posted as embeds (one per message, grouped by project phase) and bui
 
 ## Threads in each project channel
 
-So the main channel stays a conversation, the bot posts three kinds of thing in public threads under it, made the first time they're needed (`ensureProjectThread` in `src/discord/channels.ts`):
+So the main channel stays a conversation, the bot posts four kinds of thing in public threads under it, made the first time they're needed (`ensureProjectThread` in `src/discord/channels.ts`):
 - **📞 Calls:** the consent message, "the call has ended", the call notes and transcripts. When a call starts, the main channel gets one line pointing to the voice channel and the thread.
+- **📎 Files:** the AI notes on each shared file and link.
 - **🔧 Code changes:** Tessl's pull requests, opened, merged or closed.
 - **📈 Progress updates:** Claude Code's updates.
 
@@ -299,6 +301,18 @@ Boran runs `/call start` in a project channel. The bot joins the project's priva
 - **Calls feed** `/ask`, `/create-specs`, `/sync-docs` and the evidence pack (`/export` attaches every transcript).
 - **Tested 10 Nov** with spoken audio through the real pipeline: Gemini transcribed each turn word for word, and the summary kept deposits as an open question because they needed a quote.
 - **Touches:** a call with a client is a touch, recorded or not.
+
+## Shared files and links
+
+Everything posted in a project channel (or its threads) by a person is read once, when it's posted (`src/discord/files.ts`), into an append-only `file_note`. The file itself stays on Discord.
+
+- **What it reads:** PDFs (Gemini reads the pages itself), images, Word, PowerPoint and Excel (text, tables, slide notes and the largest pictures, pulled out of the zip by our own reader: `src/files/zip.ts`, `office.ts`), voice notes and audio (ElevenLabs, or Gemini without a key), short videos (Gemini), zips (the file list and text files inside), text and code, and public links: web pages, and Google Docs, Sheets and Slides shared with "anyone with the link" (read through their export). Discord, GitHub (that's `/review-repo`), GIF sites and explorer links are left alone.
+- **What it can't:** Figma, Loom, Miro, Canva and Drive links, private pages, old `.doc`/`.ppt`/`.xls`, GIFs, and anything too large to send inline (about 14 MB). For an attachment, or a link that needs a sign-in, the bot replies under the message saying what to send instead; the skip is saved so it isn't tried again. A link that just fails (404) is skipped quietly.
+- **Links are fetched safely** (`src/files/links.ts`): https only, port 443, no credentials in the URL, at most 4 redirects, 14 MB, 20 s. Every address is checked inside the connection's own DNS lookup, so a name can't point at a private or local address (no reaching Replit's internals or cloud metadata).
+- **Each read:** 👀 on the message, then Gemini (`files-v1`, low thinking) writes a title, summary, detailed notes with places (page, slide, timestamp), requirements and open questions. Saved with a `file.read` event (or `file.not_read`), posted in 📎 Files marked as AI notes, then ✅. A failure (Gemini, a download) saves nothing, tells Boran in `#owner-desk`, and is tried again later.
+- **Limits:** 40 reads per project per London day, two at a time across the bot. `/read-files` (owner) catches up on anything without notes; `/create-specs` and `/sync-docs` catch up on up to 10 messages first.
+- **Notes feed** `/create-specs` and `/sync-docs` (as `<files>`; images are still sent to them as pictures too), `/ask`, Claude Code's brief (newest first, about 24,000 characters), and `docs/project/files.md`. Docs cite a file as `[file roadmap.pdf, 2026-11-11 12:40]`, optionally with a place (`, p. 4`), and the citation check knows every file.
+- **Tested 10 Nov** with the real Gemini: a PDF (6 s), a Word file (4 s) and observv.com through the safe fetcher (10 s), each with sensible notes.
 
 ## Project docs in the repo
 

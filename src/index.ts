@@ -9,6 +9,7 @@ import { APPROVE_PREFIX, DECLINE_PREFIX, onApproveChange, onDeclineChange } from
 import { CONFIRM_DELIVERY_BUTTON, onConfirmDeliveryButton } from './discord/commands/delivery.js';
 import { onMemberAdd } from './discord/joins.js';
 import { onOwnerMention } from './discord/ownerAnswer.js';
+import { discordFileReader, onSharedMessage } from './discord/files.js';
 import { CONSENT_PREFIX, onCallConsent } from './discord/commands/call.js';
 import type { BotContext } from './discord/command.js';
 import { createCallManager } from './voice/calls.js';
@@ -64,6 +65,7 @@ async function main(): Promise<void> {
   };
   log.info('call transcription', { service: ctx.stt ? 'ElevenLabs' : 'Gemini' });
   ctx.calls = createCallManager(ctx);
+  ctx.files = discordFileReader(ctx, client);
 
   // Claude Code's progress updates: posted in the project's channel, pinging nobody.
   mcp = createMcpHandler({
@@ -83,6 +85,7 @@ async function main(): Promise<void> {
 
   client.once(Events.ClientReady, (ready) => {
     log.info('discord ready', { user: ready.user.tag, guild: env.DISCORD_GUILD_ID });
+    ctx.botId = ready.user.id;
     void safeRecord(ctx, { actor: 'bot', action: 'bot.started', outcome: 'ok' });
     stopWatcher = startPaymentWatcher(client, ctx);
     stopPullWatcher = startPullRequestWatcher(client, ctx);
@@ -103,7 +106,10 @@ async function main(): Promise<void> {
     void onMemberAdd(member, ctx);
   });
   client.on(Events.MessageCreate, (message) => {
-    if (client.user) void onOwnerMention(message, ctx, client.user.id);
+    if (!client.user) return;
+    void onOwnerMention(message, ctx, client.user.id);
+    // Files and links shared in a project channel are read once, into notes.
+    if (ctx.files) void onSharedMessage(message, ctx, ctx.files, client.user.id).catch((error: unknown) => log.warn('could not read a shared message', { error }));
   });
 
   const shutdown = async (signal: string) => {

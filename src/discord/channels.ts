@@ -194,11 +194,12 @@ export async function openProjectVoiceTo(guild: Guild, name: string, userId: str
 }
 
 /** Threads in each project channel, so the main chat stays a conversation. */
-export type ThreadKind = 'calls' | 'code' | 'updates';
+export type ThreadKind = 'calls' | 'code' | 'updates' | 'files';
 export const THREAD_NAMES: Record<ThreadKind, string> = {
   calls: '📞 Calls',
   code: '🔧 Code changes',
   updates: '📈 Progress updates',
+  files: '📎 Files',
 };
 
 async function findThread(channel: TextChannel, name: string): Promise<ThreadChannel | undefined> {

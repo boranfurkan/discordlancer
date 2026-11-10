@@ -77,7 +77,7 @@ describe('renderAnswerInput', () => {
 
   it('includes the chat with each speaker, newest kept when it is very long', () => {
     const at = new Date('2026-11-10T10:00:00Z');
-    const said = (role: 'owner' | 'client' | 'bot', text: string) => ({ at, role, author: role, text, attachments: [] });
+    const said = (role: 'owner' | 'client' | 'bot', text: string) => ({ id: text.slice(0, 8), at, role, author: role, text, attachments: [] });
     const input = renderAnswerInput(base({ messages: [said('client', 'old start'), said('bot', 'x'.repeat(ANSWER_CONVERSATION_CHARS)), said('owner', 'latest word')] }));
     expect(input).toContain('<conversation truncated>');
     expect(input).not.toContain('old start');

@@ -6,18 +6,18 @@ const MB = 1024 * 1024;
 const at = (minute: number) => new Date(Date.UTC(2026, 10, 9, 10, minute));
 
 function message(minute: number, role: ChatMessage['role'], text: string, attachments: ChatMessage['attachments'] = []): ChatMessage {
-  return { at: at(minute), role, author: role === 'client' ? 'Alice' : 'Furkan', text, attachments };
+  return { id: `m${minute}`, at: at(minute), role, author: role === 'client' ? 'Alice' : 'Furkan', text, attachments };
 }
 
-const image = (name: string, size = 100_000) => ({ name, contentType: 'image/png', size, url: `https://cdn.example/${name}` });
+const image = (name: string, size = 100_000) => ({ id: name, name, contentType: 'image/png', size, url: `https://cdn.example/${name}` });
 
 describe('planAttachments', () => {
   it('sends images and small text files, and says why others were skipped', () => {
     const plan = planAttachments([
       message(1, 'client', 'see', [
         image('a.png'),
-        { name: 'notes.txt', contentType: 'text/plain; charset=utf-8', size: 500, url: 'https://cdn.example/notes.txt' },
-        { name: 'brief.pdf', contentType: 'application/pdf', size: 500, url: 'https://cdn.example/brief.pdf' },
+        { id: 'att', name: 'notes.txt', contentType: 'text/plain; charset=utf-8', size: 500, url: 'https://cdn.example/notes.txt' },
+        { id: 'att', name: 'brief.pdf', contentType: 'application/pdf', size: 500, url: 'https://cdn.example/brief.pdf' },
         image('huge.png', 8 * MB),
       ]),
     ]);
@@ -45,7 +45,7 @@ describe('renderConversation', () => {
     const messages = [
       message(1, 'client', 'I need a booking app', [image('mock.png')]),
       message(2, 'owner', 'Which platforms?', [
-        { name: 'notes.txt', contentType: 'text/plain', size: 10, url: 'https://cdn.example/notes.txt' },
+        { id: 'att', name: 'notes.txt', contentType: 'text/plain', size: 10, url: 'https://cdn.example/notes.txt' },
       ]),
     ];
     const plan = planAttachments(messages);

@@ -2,12 +2,13 @@
 // (not the bot's), with images and small text files attached. The pure parts
 // (choosing attachments, rendering the text) are separate so they can be tested.
 
-import type { TextChannel } from 'discord.js';
+import type { Message, TextChannel } from 'discord.js';
 import { IMAGE_TYPES, type Part } from '../services/gemini.js';
 
 export type Role = 'owner' | 'client' | 'other' | 'bot';
 
 export interface ChatAttachment {
+  id: string;
   name: string;
   contentType: string | null;
   size: number;
@@ -15,6 +16,7 @@ export interface ChatAttachment {
 }
 
 export interface ChatMessage {
+  id: string;
   at: Date;
   role: Role;
   author: string;
@@ -31,14 +33,9 @@ export const LIMITS = {
   maxTranscriptChars: 300_000,
 };
 
-export async function readConversation(
-  channel: TextChannel,
-  since: Date,
-  people: { ownerId: string; clientIds: readonly string[] },
-  /** Also include the bot's own posts (for answering questions; specs leave them out). */
-  options: { includeBot?: boolean } = {},
-): Promise<ChatMessage[]> {
-  const messages: ChatMessage[] = [];
+/** The channel's messages since `since`, newest first, up to LIMITS.maxPages pages. */
+export async function messagesSince(channel: TextChannel, since: Date): Promise<Message[]> {
+  const messages: Message[] = [];
   let before: string | undefined;
   for (let page = 0; page < LIMITS.maxPages; page++) {
     const batch = await channel.messages.fetch({ limit: 100, ...(before ? { before } : {}) });
@@ -49,29 +46,45 @@ export async function readConversation(
         reachedStart = true;
         continue;
       }
-      if (message.system || (message.author.bot && !options.includeBot)) continue;
-      const role: Role = message.author.bot
-        ? 'bot'
-        : message.author.id === people.ownerId
-          ? 'owner'
-          : people.clientIds.includes(message.author.id)
-            ? 'client'
-            : 'other';
-      messages.push({
-        at: message.createdAt,
-        role,
-        author: message.member?.displayName ?? message.author.username,
-        text: message.content,
-        attachments: [...message.attachments.values()].map((attachment) => ({
-          name: attachment.name,
-          contentType: attachment.contentType,
-          size: attachment.size,
-          url: attachment.url,
-        })),
-      });
+      messages.push(message);
     }
     before = batch.last()?.id;
     if (reachedStart || batch.size < 100) break;
+  }
+  return messages;
+}
+
+export async function readConversation(
+  channel: TextChannel,
+  since: Date,
+  people: { ownerId: string; clientIds: readonly string[] },
+  /** Also include the bot's own posts (for answering questions; specs leave them out). */
+  options: { includeBot?: boolean } = {},
+): Promise<ChatMessage[]> {
+  const messages: ChatMessage[] = [];
+  for (const message of await messagesSince(channel, since)) {
+    if (message.system || (message.author.bot && !options.includeBot)) continue;
+    const role: Role = message.author.bot
+      ? 'bot'
+      : message.author.id === people.ownerId
+        ? 'owner'
+        : people.clientIds.includes(message.author.id)
+          ? 'client'
+          : 'other';
+    messages.push({
+      id: message.id,
+      at: message.createdAt,
+      role,
+      author: message.member?.displayName ?? message.author.username,
+      text: message.content,
+      attachments: [...message.attachments.values()].map((attachment) => ({
+        id: attachment.id,
+        name: attachment.name,
+        contentType: attachment.contentType,
+        size: attachment.size,
+        url: attachment.url,
+      })),
+    });
   }
   return messages.sort((a, b) => a.at.getTime() - b.at.getTime());
 }
@@ -120,6 +133,8 @@ export function renderConversation(
   messages: readonly ChatMessage[],
   plan: AttachmentPlan,
   fileTexts: ReadonlyMap<string, string>,
+  /** Attachments with saved AI notes (by attachment ID), given in <files>. */
+  noted: ReadonlySet<string> = new Set(),
 ): string {
   const imageNumber = new Map(plan.images.map((image, index) => [image.url, index + 1]));
   const textUrls = new Set(plan.textFiles.map((file) => file.url));
@@ -131,10 +146,12 @@ export function renderConversation(
     lines.push(`[${when} UTC] ${who}: ${message.text}`.trimEnd());
     for (const attachment of message.attachments) {
       const number = imageNumber.get(attachment.url);
-      if (number !== undefined) lines.push(`  [image ${number}: ${attachment.name}]`);
+      const notes = noted.has(attachment.id) ? ' (AI notes in <files>)' : '';
+      if (number !== undefined) lines.push(`  [image ${number}: ${attachment.name}]${notes}`);
       else if (textUrls.has(attachment.url)) {
-        lines.push(`  [file: ${attachment.name}]`, `  <file name="${attachment.name}">`, fileTexts.get(attachment.url) ?? '', '  </file>');
-      } else lines.push(`  [file not read: ${attachment.name} (${skipped.get(attachment.name) ?? 'skipped'})]`);
+        lines.push(`  [file: ${attachment.name}]${notes}`, `  <file name="${attachment.name}">`, fileTexts.get(attachment.url) ?? '', '  </file>');
+      } else if (notes) lines.push(`  [file: ${attachment.name}]${notes}`);
+      else lines.push(`  [file not read: ${attachment.name} (${skipped.get(attachment.name) ?? 'skipped'})]`);
     }
   }
   lines.push('</conversation>');
@@ -150,7 +167,7 @@ async function download(url: string): Promise<Buffer> {
 }
 
 /** Downloads the planned attachments: the conversation as text, and the images as parts, in order. */
-export async function conversationParts(messages: readonly ChatMessage[]): Promise<{ text: string; images: Part[]; plan: AttachmentPlan }> {
+export async function conversationParts(messages: readonly ChatMessage[], noted: ReadonlySet<string> = new Set()): Promise<{ text: string; images: Part[]; plan: AttachmentPlan }> {
   const plan = planAttachments(messages);
   const fileTexts = new Map<string, string>();
   for (const file of plan.textFiles) fileTexts.set(file.url, (await download(file.url)).toString('utf8'));
@@ -159,7 +176,7 @@ export async function conversationParts(messages: readonly ChatMessage[]): Promi
     images.push({ type: 'image', data: (await download(image.url)).toString('base64'), mime_type: image.contentType!.split(';')[0]!.trim() });
   }
   const note = plan.images.length ? `\n\nThe ${plan.images.length} image(s) after this text are the attachments numbered in the conversation, in order.` : '';
-  return { text: `${renderConversation(messages, plan, fileTexts)}${note}`, images, plan };
+  return { text: `${renderConversation(messages, plan, fileTexts, noted)}${note}`, images, plan };
 }
 
 /** Gemini's input for a spec: text first, then the images in order. */
@@ -169,12 +186,18 @@ export async function buildSpecInput(
   memory = '',
   /** Recorded calls, already rendered by renderCalls(). */
   calls = '',
+  /** Shared files' notes (renderFileNotes()) and the attachments they cover. */
+  files: { text: string; noted: ReadonlySet<string> } = { text: '', noted: new Set() },
+  /** Reviews of existing repos, already rendered. */
+  references = '',
 ): Promise<{ input: Part[]; plan: AttachmentPlan }> {
-  const conversation = await conversationParts(messages);
+  const conversation = await conversationParts(messages, files.noted);
   const sections = [
     previous ? `<previous_spec version="${previous.version}">\n${previous.markdown}\n</previous_spec>` : 'There is no previous spec.',
     memory ? `<memory>\n${memory}\n</memory>` : '',
     calls,
+    files.text,
+    references,
     conversation.text,
   ].filter(Boolean);
   return { input: [{ type: 'text', text: sections.join('\n\n') }, ...conversation.images], plan: conversation.plan };

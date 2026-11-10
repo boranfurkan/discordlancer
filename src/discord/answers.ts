@@ -5,6 +5,8 @@
 
 import type { Guild, TextChannel } from 'discord.js';
 import { callsFor, type Call } from '../db/calls.js';
+import { fileNotesFor, type FileNote } from '../db/files.js';
+import { renderFileNotes } from '../files/noteText.js';
 import { changeRequestsFor, type ChangeRequest } from '../db/changes.js';
 import { agreedParties, latestQuote, latestSpec, type Quote, type Spec } from '../db/deals.js';
 import { eventsForProject, recordEvent, type Actor } from '../db/events.js';
@@ -38,6 +40,7 @@ export interface AnswerContext {
   payments: readonly Payment[];
   changes: readonly ChangeRequest[];
   calls?: readonly Call[];
+  files?: readonly FileNote[];
   updates?: ReadonlyArray<{ at: Date; summary: string }>;
   memory: string;
   messages: readonly ChatMessage[];
@@ -68,7 +71,8 @@ export function renderAnswerInput(context: AnswerContext): string {
     project.delivery_marked_at ? `Marked delivered: ${project.delivery_marked_at.toISOString().slice(0, 10)}${project.delivery_note ? ` (${project.delivery_note})` : ''}.` : '',
   ].filter(Boolean);
 
-  const conversation = renderConversation(context.messages, { images: [], textFiles: [], skipped: [] }, new Map());
+  const noted = new Set((context.files ?? []).filter((note) => note.source === 'attachment' && note.status === 'read').map((note) => note.source_id));
+  const conversation = renderConversation(context.messages, { images: [], textFiles: [], skipped: [] }, new Map(), noted);
   const trimmed =
     conversation.length > ANSWER_CONVERSATION_CHARS ? `<conversation truncated>\n${conversation.slice(-ANSWER_CONVERSATION_CHARS)}` : conversation;
 
@@ -89,6 +93,7 @@ export function renderAnswerInput(context: AnswerContext): string {
     context.memory ? fence('memory', context.memory) : '',
     context.updates?.length ? fence('progress_updates', context.updates.map((update) => `- ${update.at.toISOString().slice(0, 10)}: ${update.summary}`).join('\n')) : '',
     renderCalls(context.calls ?? []),
+    renderFileNotes(context.files ?? [], { perFile: 8_000, total: 60_000 }),
     trimmed,
     code,
     context.ownerNote ? fence('owner_note', context.ownerNote) : '',
@@ -101,6 +106,7 @@ export function renderAnswerInput(context: AnswerContext): string {
 const SOURCE_LABEL: Record<AnswerOutput['based_on'][number], string> = {
   chat: 'the chat',
   calls: 'the call notes',
+  files: 'the shared files',
   updates: 'the progress updates',
   spec: 'the spec',
   quote: 'the quote',
@@ -132,12 +138,16 @@ export async function answerQuestion(
   question: string,
   ownerNote?: string,
 ): Promise<{ output: AnswerOutput; commit?: string | undefined }> {
-  const [spec, quote, payments, changes, calls, events, memory, messages, code] = await Promise.all([
+  const [spec, quote, payments, changes, calls, files, events, memory, messages, code] = await Promise.all([
     latestSpec(ctx.db, project),
     latestQuote(ctx.db, project),
     paymentsFor(ctx.db, project),
     changeRequestsFor(ctx.db, project),
     callsFor(ctx.db, project),
+    fileNotesFor(ctx.db, project).catch((error: unknown) => {
+      log.warn('could not load the file notes for an answer', { project: project.name, error });
+      return [];
+    }),
     eventsForProject(ctx.db, project.id),
     safeRecall(ctx.memory, projectScope(project.name), question),
     readConversation(channel, project.created_at, { ownerId: ctx.env.DISCORD_OWNER_ID, clientIds: clientMembers(project) }, { includeBot: true }),
@@ -156,6 +166,7 @@ export async function answerQuestion(
     payments,
     changes,
     calls,
+    files,
     updates: events
       .filter((event) => event.action === 'dev.update_posted' && event.outcome === 'ok' && typeof event.data?.summary === 'string')
       .slice(-10)

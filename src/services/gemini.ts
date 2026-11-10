@@ -16,7 +16,10 @@ export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/heic
 export type Part =
   | { type: 'text'; text: string }
   | { type: 'image'; data: string; mime_type: string }
-  | { type: 'audio'; data: string; mime_type: string };
+  | { type: 'audio'; data: string; mime_type: string }
+  /** PDFs (and CSV): Gemini reads the pages, tables and pictures itself. */
+  | { type: 'document'; data: string; mime_type: string }
+  | { type: 'video'; data: string; mime_type: string };
 
 export interface JsonRequest<T> {
   model: string;

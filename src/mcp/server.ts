@@ -11,6 +11,7 @@ import type { Surreal } from 'surrealdb';
 import { changeRequestsFor } from '../db/changes.js';
 import { agreedParties, latestQuote, latestSpec } from '../db/deals.js';
 import { countEventsSince, eventsForProject, recordEvent } from '../db/events.js';
+import { fileNotesFor } from '../db/files.js';
 import { paymentsFor } from '../db/payments.js';
 import { getProjectByDevKeyHash, type Project } from '../db/projects.js';
 import { londonDayStart } from '../domain/deadline.js';
@@ -65,7 +66,7 @@ const TOOLS = [
     name: 'get_project_brief',
     title: 'Read the project brief',
     description:
-      "This project's current state from Discordlancer: stage, the latest spec and whether it is agreed, the quote's deadline, payments, change requests, and the progress updates already posted (with how many are left today). Read-only.",
+      "This project's current state from Discordlancer: stage, the latest spec and whether it is agreed, the quote's deadline, payments, change requests, AI notes on the files and links the client shared, and the progress updates already posted (with how many are left today). Read-only.",
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
@@ -104,13 +105,14 @@ export function chooseProtocolVersion(requested: unknown): string {
 }
 
 async function brief(deps: McpDeps, project: Project, now: Date): Promise<ToolResult> {
-  const [spec, quote, payments, changes, events, updatesToday] = await Promise.all([
+  const [spec, quote, payments, changes, events, updatesToday, files] = await Promise.all([
     latestSpec(deps.db, project),
     latestQuote(deps.db, project),
     paymentsFor(deps.db, project),
     changeRequestsFor(deps.db, project),
     eventsForProject(deps.db, project.id),
     countEventsSince(deps.db, project.id, UPDATE_ACTION, londonDayStart(now)),
+    fileNotesFor(deps.db, project),
   ]);
   const specAgreed = spec ? [...(await agreedParties(deps.db, project, 'spec', spec.version))] : [];
   const quoteAgreed = quote ? [...(await agreedParties(deps.db, project, 'quote', quote.version))] : [];
@@ -127,6 +129,7 @@ async function brief(deps: McpDeps, project: Project, now: Date): Promise<ToolRe
       changes,
       updates,
       updatesToday,
+      files,
     }),
   );
 }

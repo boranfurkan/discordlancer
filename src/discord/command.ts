@@ -10,6 +10,7 @@ import type { GitHubApi } from '../services/github.js';
 import type { MemoryApi } from '../services/memory.js';
 import type { SolanaApi } from '../services/solana.js';
 import type { CallManager } from '../voice/calls.js';
+import type { FileReader } from './files.js';
 
 export interface BotContext {
   env: Env;
@@ -23,6 +24,10 @@ export interface BotContext {
   calls?: CallManager;
   /** ElevenLabs speech to text, when its key is set; otherwise Gemini transcribes calls. */
   stt?: SpeechToTextApi;
+  /** Reads shared files and links into notes; absent in tests that don't use it. */
+  files?: FileReader;
+  /** The bot's own user ID, once logged in (to remove its own reactions). */
+  botId?: string;
 }
 
 /** Who may run a command. Every command is visible to everyone. */

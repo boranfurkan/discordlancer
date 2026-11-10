@@ -13,6 +13,7 @@ import { linkClient } from './linkClient.js';
 import { newProject } from './newProject.js';
 import { paid, pay, receipt, startDevelopment } from './pay.js';
 import { projectInfo } from './project.js';
+import { readFiles } from './readFiles.js';
 import { acceptQuote, quote } from './quote.js';
 import { agreeSpecs, createSpecs } from './specs.js';
 import { syncDocs } from './syncDocs.js';
@@ -40,6 +41,7 @@ export const COMMANDS: readonly Command[] = [
   status,
   ask,
   call,
+  readFiles,
   syncDocs,
   requestUpdate,
   exportEvidence,

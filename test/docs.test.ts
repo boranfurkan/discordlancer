@@ -11,9 +11,17 @@ const known: KnownSources = {
   quotes: new Set([1]),
   changes: new Set(['2026-11-20']),
   updates: new Set(['2026-11-14']),
+  files: new Set(['image.png, 2026-11-12 14:05']),
+  repos: new Set(['acme/old-app']),
 };
 
 describe('citation check', () => {
+  it('accepts a shared file by its label, with or without a place in it, and a reviewed repo', () => {
+    const text = '- Same colours [file image.png, 2026-11-12 14:05] [file image.png, 2026-11-12 14:05, top left] [repo Acme/old-app]';
+    expect(checkCitations([text], known)).toEqual({ total: 3, unmatched: [] });
+    expect(checkCitations(['[file image.png, 2026-11-12 14:06] [file image.png] [repo acme/other]'], known).unmatched).toHaveLength(3);
+  });
+
   it('accepts citations that point at real sources', () => {
     const text = '- Pick a barber [chat 2026-11-12 14:03] [call 2026-11-13 10:00, 00:12:30] [spec v2] [quote v1] [change 2026-11-20] [update 2026-11-14]';
     expect(checkCitations([text], known)).toEqual({ total: 6, unmatched: [] });

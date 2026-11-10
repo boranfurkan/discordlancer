@@ -13,6 +13,8 @@ import { requireProject, UserError, type Command } from '../command.js';
 import { OWNER_NAME } from '../guards.js';
 import { clientMentions, fitMessage } from '../texts.js';
 import { buildSpecInput, readConversation } from '../transcript.js';
+import { currentFileNotes } from '../files.js';
+import { renderFileNotes } from '../../files/noteText.js';
 
 const createDescription = 'Write the next spec version from this conversation (AI-drafted)';
 
@@ -40,7 +42,10 @@ export const createSpecs: Command = {
     const previous = await latestSpec(ctx.db, project);
     const memory = await safeRecall(ctx.memory, projectScope(project.name), 'Decisions, preferences and constraints agreed for this project');
     const calls = renderCalls(await callsFor(ctx.db, project));
-    const { input, plan } = await buildSpecInput(messages, previous, memory, calls);
+    // Anything shared while the bot was down is read now, so the spec sees every file.
+    const notes = await currentFileNotes(ctx, project, interaction.channel);
+    const noted = new Set(notes.filter((note) => note.source === 'attachment' && note.status === 'read').map((note) => note.source_id));
+    const { input, plan } = await buildSpecInput(messages, previous, memory, calls, { text: renderFileNotes(notes), noted });
 
     let output;
     try {
@@ -76,7 +81,7 @@ export const createSpecs: Command = {
           actorId: interaction.user.id,
           action: 'spec.created',
           outcome: 'ok',
-          data: { messages: messages.length, images: plan.images.length, skipped: plan.skipped.map((item) => item.name) },
+          data: { messages: messages.length, images: plan.images.length, files: notes.filter((note) => note.status === 'read').length, skipped: plan.skipped.filter((item) => !notes.some((note) => note.name === item.name)).map((item) => item.name) },
         },
       );
     } catch (error) {
@@ -92,7 +97,8 @@ export const createSpecs: Command = {
     ];
     if (previous && output.changes.length) lines.push('', `**Changes since v${previous.version}:**`, ...output.changes.map((c) => `- ${c}`));
     if (output.open_questions.length) lines.push('', '**Open questions:**', ...output.open_questions.map((q) => `- ${q}`));
-    if (plan.skipped.length) lines.push('', `Not read: ${plan.skipped.map((item) => `${item.name} (${item.reason})`).join(', ')}`);
+    const unread = notes.filter((note) => note.status === 'skipped');
+    if (unread.length) lines.push('', `Couldn't read: ${unread.map((note) => `${note.name} (${note.reason ?? 'unknown'})`).join(', ')}`);
     if (reset) lines.push('', 'This is a new version, so any earlier agreement or accepted quote no longer applies.');
     lines.push('', `Both of you: read the attached file, then run **/agree-specs** to agree to v${version}.`);
 

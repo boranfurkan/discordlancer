@@ -50,6 +50,11 @@ export const GUIDE: Record<string, GuideEntry> = {
       'The AI answers in the channel from the chat, calls, progress updates, spec, quote, payments, change requests, memory and the code, marked as an AI answer. It never agrees to new prices, dates or scope; anything needing you is flagged in #owner-desk. Clients get 15 a day per project; you have no limit.',
     client: `Ask anything about your project: what was agreed, how it is going, what comes next. The AI assistant answers in your channel from your conversation, calls, the spec and the code, and marks the answer as AI. It never agrees to new prices, dates or features: anything like that goes to ${OWNER_NAME}. Up to 15 questions a day.`,
   },
+  'read-files': {
+    phase: 'anytime',
+    owner:
+      'Files and links are read by themselves when posted; this catches up on anything that has no notes yet (posted while the bot was down, a read that failed, or past the daily limit of 40). Up to 30 messages at a time; `/create-specs` and `/sync-docs` also catch up on a few first.',
+  },
   'add-github': {
     phase: 'anytime',
     owner: "Adds a GitHub account to the project's repo with read-only access: they can see and clone the code, never push.",
@@ -234,10 +239,14 @@ export function ownerGuide(commands: readonly Listed[]): APIEmbed[] {
           "Answer a client's message",
           'Reply to it and tag the bot; words after the tag are a note for the answer ("say SMS is extra"). Or right-click it, **Apps**, **Answer with AI** (only you see it). Marked as AI. These count as touches.',
         ),
+        field(
+          'Files and links',
+          'Everything posted in a project channel or its threads is read once (👀, then ✅): PDFs, Word, Excel and PowerPoint files, screenshots, voice notes (ElevenLabs), short videos, zips, public web pages and public Google Docs. The notes go in the 📎 Files thread and into specs, `/ask`, `/sync-docs` (docs/project/files.md) and Claude Code\'s brief. Something unreadable (Figma, Loom, a private link) gets a reply saying what to send instead.',
+        ),
         field('Buttons', "**Approve** / **Decline** on change requests (you only), **Confirm delivery** (client side), **Record me** / **Don't record me** on calls (each person for themselves)."),
         field(
           'Threads in each project channel',
-          "📞 Calls (consent, notes, transcripts), 🔧 Code changes (Tessl's pull requests), 📈 Progress updates (Claude Code). Everyone on the project is added, so they are notified. The main channel stays a conversation.",
+          "📞 Calls (consent, notes, transcripts), 📎 Files (notes on shared files and links), 🔧 Code changes (Tessl's pull requests and previews), 📈 Progress updates (Claude Code). Everyone on the project is added, so they are notified. The main channel stays a conversation.",
         ),
         field('#owner-desk', "Joins the bot couldn't match, questions that need you, pull requests to review, evidence packs, and anything that went wrong."),
       ],
@@ -319,8 +328,12 @@ export function clientGuide(commands: readonly Listed[]): APIEmbed[] {
       fields: [
         field('The main chat', `For talking with ${OWNER_NAME}: questions, ideas, feedback, files.`),
         field(
+          'Files and links',
+          'Share anything that explains what you need: PDFs, Word, Excel or PowerPoint files, screenshots, voice notes, short screen recordings, zips, or links to public pages and Google Docs shared with "anyone with the link". The bot reads each one (👀, then ✅) and posts its notes in the 📎 Files thread, so nothing gets lost. Figma, Loom and private links can\'t be read: export or download them and post the file instead.',
+        ),
+        field(
           'Threads',
-          '📞 **Calls**: recording consent, call notes and transcripts. 🔧 **Code changes**: changes made after delivery. 📈 **Progress updates**: how the build is going. You are added to each, so you get notified.',
+          '📞 **Calls**: recording consent, call notes and transcripts. 📎 **Files**: notes on what you shared. 🔧 **Code changes**: previews and changes. 📈 **Progress updates**: how the build is going. You are added to each, so you get notified.',
         ),
         field(
           'Your team',
@@ -332,10 +345,10 @@ export function clientGuide(commands: readonly Listed[]): APIEmbed[] {
       title: '🔒 Privacy and AI',
       color: 0x2b2d31,
       fields: [
-        field('What is kept', 'A record of your project: the messages in your channel, the commands you run, payments, and call transcripts (never the audio). It gives you both a clear history.'),
+        field('What is kept', 'A record of your project: the messages in your channel, the commands you run, payments, call transcripts (never the audio), and notes on the files and links you share (the files themselves stay in Discord). It gives you both a clear history.'),
         field(
           'AI',
-          `Specs, answers to /ask, progress estimates, call summaries and project docs are drafted with Google Gemini, which does not keep them. Calls are transcribed by ElevenLabs. Progress updates are written by ${OWNER_NAME}'s AI coding assistant, Claude. Everything AI-written is marked as such.`,
+          `Specs, answers to /ask, progress estimates, call summaries, notes on shared files and project docs are drafted with Google Gemini, which does not keep them. Calls and voice notes are transcribed by ElevenLabs. Progress updates are written by ${OWNER_NAME}'s AI coding assistant, Claude. Everything AI-written is marked as such.`,
         ),
         field('Who sees what', `Only you, your team, ${OWNER_NAME} and the bot see your project channel. Your code is in a private repository; \`/add-github\` gives you read-only access.`),
       ],

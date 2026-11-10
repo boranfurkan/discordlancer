@@ -194,3 +194,41 @@ DEFINE INDEX OVERWRITE issued_invoice_sequence ON issued_invoice FIELDS sequence
 DEFINE EVENT OVERWRITE append_only ON issued_invoice WHEN $event IN ["UPDATE", "DELETE"] THEN {
   THROW "invoice records are append-only";
 };
+
+-- File notes (append-only) ---------------------------------------------------------
+-- AI notes on each file or link shared in a project channel, written once when it is
+-- read. The file itself stays on Discord (or the web); only the notes are kept. A file
+-- the bot can't read gets a "skipped" note with the reason, so it isn't tried again.
+
+DEFINE TABLE OVERWRITE file_note SCHEMAFULL;
+DEFINE FIELD OVERWRITE project ON file_note TYPE record<project>;
+-- The attachment's Discord ID, or "link:<message id>:<hash of the URL>".
+DEFINE FIELD OVERWRITE source_id ON file_note TYPE string;
+DEFINE FIELD OVERWRITE source ON file_note TYPE string ASSERT $value IN ["attachment", "link"];
+DEFINE FIELD OVERWRITE message_id ON file_note TYPE string;
+DEFINE FIELD OVERWRITE message_url ON file_note TYPE string;
+DEFINE FIELD OVERWRITE author_id ON file_note TYPE string;
+DEFINE FIELD OVERWRITE author_role ON file_note TYPE string ASSERT $value IN ["owner", "client", "other"];
+DEFINE FIELD OVERWRITE author_name ON file_note TYPE string;
+DEFINE FIELD OVERWRITE posted_at ON file_note TYPE datetime;
+DEFINE FIELD OVERWRITE name ON file_note TYPE string;
+-- Links only: the address. Attachment addresses expire, so they aren't kept.
+DEFINE FIELD OVERWRITE link ON file_note TYPE option<string>;
+DEFINE FIELD OVERWRITE kind ON file_note TYPE string;
+DEFINE FIELD OVERWRITE size ON file_note TYPE option<int>;
+DEFINE FIELD OVERWRITE sha256 ON file_note TYPE option<string>;
+DEFINE FIELD OVERWRITE status ON file_note TYPE string ASSERT $value IN ["read", "skipped"];
+DEFINE FIELD OVERWRITE reason ON file_note TYPE option<string>;
+DEFINE FIELD OVERWRITE title ON file_note TYPE option<string>;
+DEFINE FIELD OVERWRITE summary ON file_note TYPE option<string>;
+DEFINE FIELD OVERWRITE details ON file_note TYPE option<string>;
+DEFINE FIELD OVERWRITE requirements ON file_note TYPE option<array<string>>;
+DEFINE FIELD OVERWRITE open_questions ON file_note TYPE option<array<string>>;
+DEFINE FIELD OVERWRITE model ON file_note TYPE option<string>;
+DEFINE FIELD OVERWRITE prompt_version ON file_note TYPE option<string>;
+DEFINE FIELD OVERWRITE created_at ON file_note TYPE datetime VALUE time::now() READONLY;
+DEFINE INDEX OVERWRITE file_note_source ON file_note FIELDS project, source_id UNIQUE;
+DEFINE INDEX OVERWRITE file_note_posted ON file_note FIELDS project, posted_at;
+DEFINE EVENT OVERWRITE append_only ON file_note WHEN $event IN ["UPDATE", "DELETE"] THEN {
+  THROW "file notes are append-only";
+};

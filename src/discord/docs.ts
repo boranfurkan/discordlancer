@@ -6,6 +6,8 @@
 
 import type { TextChannel } from 'discord.js';
 import { callLabel, callsFor, type Call } from '../db/calls.js';
+import type { FileNote } from '../db/files.js';
+import { fileLabel, filesDoc, renderFileNotes } from '../files/noteText.js';
 import { changeRequestsFor, type ChangeRequest } from '../db/changes.js';
 import { agreedParties, latestQuote, listSpecs, type Quote, type Spec } from '../db/deals.js';
 import { eventsForProject } from '../db/events.js';
@@ -23,6 +25,7 @@ import type { BotContext } from './command.js';
 import { OWNER_NAME } from './guards.js';
 import { STAGE_LABEL } from './texts.js';
 import { conversationParts, readConversation, type ChatMessage } from './transcript.js';
+import { currentFileNotes } from './files.js';
 
 export const DOCS_FOLDER = 'docs/project';
 export const DOCS_BRANCH = 'discordlancer/project-docs';
@@ -32,6 +35,7 @@ export const DOC_PATHS = {
   decisions: `${DOCS_FOLDER}/decisions.md`,
   open_questions: `${DOCS_FOLDER}/open-questions.md`,
 } as const;
+export const FILES_DOC = `${DOCS_FOLDER}/files.md`;
 type DocKey = keyof typeof DOC_PATHS;
 const DOC_KEYS = Object.keys(DOC_PATHS) as DocKey[];
 
@@ -55,6 +59,9 @@ export interface DocsSources {
   changes: readonly ChangeRequest[];
   updates: ReadonlyArray<{ at: Date; summary: string }>;
   calls: readonly Call[];
+  files: readonly FileNote[];
+  /** Reviews of existing repos, already rendered. */
+  references?: string;
   memory: string;
   messages: readonly ChatMessage[];
   conversation: string;
@@ -84,6 +91,8 @@ export function renderSources(sources: DocsSources): string {
     changes.length ? fence('change_requests', changes.map((change) => `- ${day(change.created_at)} [${change.status}] ${change.text.slice(0, 600)}`).join('\n')) : '',
     updates.length ? fence('progress_updates', updates.map((update) => `- ${day(update.at)}: ${update.summary}`).join('\n')) : '',
     renderCalls(sources.calls),
+    renderFileNotes(sources.files),
+    sources.references ?? '',
     sources.memory ? fence('memory', sources.memory) : '',
     sources.conversation,
     current.length ? fence('current_docs', current.join('\n')) : '<current_docs>There are no docs in the repository yet.</current_docs>',
@@ -99,9 +108,11 @@ export interface KnownSources {
   quotes: ReadonlySet<number>;
   changes: ReadonlySet<string>;
   updates: ReadonlySet<string>;
+  files: ReadonlySet<string>;
+  repos: ReadonlySet<string>;
 }
 
-const CITATION = /\[(chat|call|spec|quote|change|update) ([^\]]+)\]/g;
+const CITATION = /\[(chat|call|spec|quote|change|update|file|repo) ([^\]]+)\]/g;
 
 const seconds = (clock: string) => clock.split(':').reduce((total, part) => total * 60 + Number(part), 0);
 
@@ -120,6 +131,9 @@ export function checkCitations(texts: readonly string[], known: KnownSources): {
         ok = version !== undefined && (kind === 'spec' ? known.specs : known.quotes).has(Number(version));
       } else if (kind === 'change') ok = known.changes.has(value.trim());
       else if (kind === 'update') ok = known.updates.has(value.trim());
+      // A file's label, optionally followed by a place in it (", p. 4").
+      else if (kind === 'file') ok = [...known.files].some((label) => value.trim() === label || value.trim().startsWith(`${label}, `));
+      else if (kind === 'repo') ok = known.repos.has(value.trim().toLowerCase());
       else {
         const call = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}), (\d{2}:\d{2}:\d{2})$/.exec(value.trim());
         const length = call ? known.calls.get(call[1]!) : undefined;
@@ -132,7 +146,11 @@ export function checkCitations(texts: readonly string[], known: KnownSources): {
 }
 
 /** Pure: what the citations may point at. */
-export function knownSources(sources: Pick<DocsSources, 'messages' | 'calls' | 'specs' | 'quote' | 'changes' | 'updates'>, quotes: readonly number[]): KnownSources {
+export function knownSources(
+  sources: Pick<DocsSources, 'messages' | 'calls' | 'specs' | 'quote' | 'changes' | 'updates' | 'files'>,
+  quotes: readonly number[],
+  repos: readonly string[] = [],
+): KnownSources {
   return {
     chat: new Set(sources.messages.map((message) => minute(message.at))),
     calls: new Map(sources.calls.map((call) => [callLabel(call), (call.ended_at.getTime() - call.started_at.getTime()) / 1000])),
@@ -140,6 +158,8 @@ export function knownSources(sources: Pick<DocsSources, 'messages' | 'calls' | '
     quotes: new Set(quotes),
     changes: new Set(sources.changes.map((change) => day(change.created_at))),
     updates: new Set(sources.updates.map((update) => day(update.at))),
+    files: new Set(sources.files.map(fileLabel)),
+    repos: new Set(repos.map((repo) => repo.toLowerCase())),
   };
 }
 
@@ -178,7 +198,7 @@ export interface DocsResult {
   changeSummary: string[];
   issues: string[];
   citations: { total: number; unmatched: string[] };
-  counts: { messages: number; images: number; files: number; calls: number; updates: number; changes: number };
+  counts: { messages: number; images: number; files: number; calls: number; updates: number; changes: number; shared?: number };
   spec?: { version: number; status: string } | undefined;
   quote?: number | undefined;
 }
@@ -202,7 +222,10 @@ export async function writeDocs(ctx: BotContext, project: Project, channel: Text
   const updates = events
     .filter((event) => event.action === 'dev.update_posted' && event.outcome === 'ok' && typeof event.data?.summary === 'string')
     .map((event) => ({ at: event.at, summary: String(event.data?.summary) }));
-  const conversation = await conversationParts(messages);
+  // Anything shared while the bot was down is read first, so the docs see every file.
+  const shared = await currentFileNotes(ctx, project, channel);
+  const noted = new Set(shared.filter((note) => note.source === 'attachment' && note.status === 'read').map((note) => note.source_id));
+  const conversation = await conversationParts(messages, noted);
   const sources: DocsSources = {
     project,
     specs,
@@ -212,6 +235,7 @@ export async function writeDocs(ctx: BotContext, project: Project, channel: Text
     changes,
     updates,
     calls,
+    files: shared,
     memory,
     messages,
     conversation: conversation.text,
@@ -244,6 +268,7 @@ export async function writeDocs(ctx: BotContext, project: Project, channel: Text
   const files: RepoFile[] = [
     ...DOC_KEYS.map((key) => ({ path: DOC_PATHS[key], content: `${review[key].trim()}\n` })),
     ...calls.map(callDoc),
+    ...(shared.length ? [{ path: FILES_DOC, content: filesDoc(shared) }] : []),
   ];
   const quoteVersions = quote ? Array.from({ length: quote.version }, (_, index) => index + 1) : [];
   return {
@@ -258,6 +283,7 @@ export async function writeDocs(ctx: BotContext, project: Project, channel: Text
       calls: calls.length,
       updates: updates.length,
       changes: changes.length,
+      shared: shared.filter((note) => note.status === 'read').length,
     },
     spec: latest ? { version: latest.version, status: agreement(specAgreedBy) } : undefined,
     quote: quote?.version,
@@ -279,7 +305,8 @@ export function pullBody(result: DocsResult, meta: { changedPaths: readonly stri
   const sources = [
     plural(counts.messages, 'chat message'),
     counts.images ? plural(counts.images, 'image') : '',
-    counts.files ? plural(counts.files, 'attached file') : '',
+    counts.files ? plural(counts.files, 'attached text file') : '',
+    counts.shared ? plural(counts.shared, 'shared file') + ' and link notes' : '',
     result.spec ? `spec v${result.spec.version} (${result.spec.status})` : 'no spec yet',
     result.quote ? `quote v${result.quote}` : '',
     counts.calls ? plural(counts.calls, 'recorded call') : '',
@@ -301,7 +328,7 @@ export function pullBody(result: DocsResult, meta: { changedPaths: readonly stri
     '',
     result.citations.unmatched.length
       ? `**Citations:** ${result.citations.total} checked; these couldn't be matched to a source, so check them before merging:\n${list(result.citations.unmatched)}`
-      : `**Citations:** ${result.citations.total} checked; each one matches a real message, call, spec, quote, change request or update.`,
+      : `**Citations:** ${result.citations.total} checked; each one matches a real message, call, file, spec, quote, change request or update.`,
     '',
     `_Written by AI (Gemini \`${SPEC_MODEL}\`, prompt \`${DOCS_PROMPT_VERSION}\`). ${OWNER_NAME} reviews it before merging. The agreed spec stays the contract._`,
   ].join('\n');

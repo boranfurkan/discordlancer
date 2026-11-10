@@ -244,6 +244,12 @@ Skills: the `tessl__*` skills, `gemini-api-dev`, `surrealdb-agent-memory-docs`.
 - [x] Guardrails tested against the real Gemini: a normal question, a discount request (refused, flagged to Boran) and a prompt injection (refused).
 - [ ] **Live check after deploying:** in a test channel, try `/ask`, a tagged reply and the menu once each.
 
+### Phase 12: Files, repo reviews, previews and deposits (added 10 Nov)
+
+- [x] Shared files and links read once when posted, into append-only `file_note`s; 📎 Files thread; `/read-files`; notes feed specs, `/ask`, docs (`files.md`) and Claude Code's brief. See `PLAN.md`, Shared files and links.
+- [x] Real check: a PDF, a Word file and observv.com read by the real Gemini.
+- [ ] **Live check after deploying:** in a test channel, post a PDF, a screenshot, a voice note and a link; check 👀/✅, the 📎 Files thread, and a reply under a `.fig` file.
+
 ### Phase 11: Client teams and threads (added 10 Nov)
 
 - [x] `/invite` for each extra person on the client's team; joins matched through the `invite` table; channel, voice, threads and the Client role for each. Anyone on the team acts for the client (Boran's choice). See `PLAN.md`, People and permissions.
