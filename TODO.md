@@ -10,11 +10,12 @@ Freeze: **Wed 18 Nov, 6pm.** The client comes first, so bot work fits around the
 2. [x] **GitHub token:** replaced with a classic token (`repo` scope only). The fine-grained token kept failing to add collaborators even with Administration: Read and write. Delete the old fine-grained token if you haven't.
 3. [x] **Discord:** the bot's role has **Pin Messages**.
 4. [x] `npm run check:env`: 23 passed on 9 Nov, morning.
-5. [ ] **Real-person check, about 2 minutes, when Ahmet Bey has time.** Run `/new-project dl-test-one` and send him only that invite. Check that only `#dl-test-one` opens, with the welcome and the Client role, and that `/help` and `/project` work for him. Everything else is covered by the automated journey test (`test/e2e/journey.test.ts`).
+5. [ ] **Real-person check:** on 9 Nov at 22:04 Ahmet joined the test project `ahmetin-yarra` through its invite and got the Client role (from the event log). Still to confirm with Boran: only that channel opened for him, and `/help` and `/project` worked.
    - [ ] **Later, Boran:** a real 0.01 USDC payment through `/pay` with Phantom, to confirm Phantom includes the reference.
 6. [x] **Review the default quote terms** in `src/discord/texts.ts` (`quoteTerms`).
 7. [x] **Deployed to Replit (9 Nov):** a Reserved VM, live at the status page https://discordlancer.replit.app. Don't run a copy on the Mac any more. Updates: push, `git pull` in Replit, Republish (`DEPLOY.md`).
    - [x] Fresh reset after deploying (9 Nov, 17:09): empty database, empty `#owner-desk`, no invites; backup in `backups/`.
+   - [x] Reset again after Boran's test with Ahmet (10 Nov, 00:28): test channel deleted, Ahmet removed from the server, database and `#owner-desk` emptied; backup in `backups/`.
 8. [ ] **Hackathon admin:**
    - [x] the organisers know you're solo;
    - [ ] declare your Solana receiving wallet to them before the first payment.
