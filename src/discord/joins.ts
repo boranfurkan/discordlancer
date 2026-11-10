@@ -10,7 +10,7 @@ import { markInviteUsed, openInvites, type Invite } from '../db/invites.js';
 import { addClientMember, getProjectByName, isClientMember, listProjectsInStage, moveStage, type Project } from '../db/projects.js';
 import { isClosed } from '../domain/stages.js';
 import { log } from '../log.js';
-import { addToProjectThreads, ensureOwnerChannel, giveClientRole, grantClient, INVITE_MAX_AGE_SECONDS, openProjectVoiceTo } from './channels.js';
+import { addToProjectThreads, CLIENT_GUIDE_CHANNEL, ensureOwnerChannel, giveClientRole, grantClient, INVITE_MAX_AGE_SECONDS, openProjectVoiceTo } from './channels.js';
 import { safeRecord } from './client.js';
 import type { BotContext } from './command.js';
 import { teamWelcomeText, welcomeText } from './texts.js';
@@ -46,6 +46,11 @@ function candidatesFrom(projects: readonly Project[]): JoinCandidate[] {
   );
 }
 
+/** The client guide channel's id, to link it in the welcome, if it exists. */
+function guideChannelId(guild: Guild): string | undefined {
+  return guild.channels.cache?.find((channel) => channel.name === CLIENT_GUIDE_CHANNEL)?.id;
+}
+
 /** Team invites as join candidates, under their project's name. */
 function teamCandidates(invites: readonly Invite[]): JoinCandidate[] {
   return invites.map((invite) => ({ name: String(invite.project.id), inviteCode: invite.code, createdAt: invite.created_at, invite }));
@@ -76,7 +81,7 @@ export async function addTeamMember(
       ? { actor: 'client', actorId: userId, action: 'project.member_joined', outcome: 'ok', data: { how } }
       : { actor: 'owner', actorId: linkedBy, action: 'project.member_linked', outcome: 'ok', data: { how, member_id: userId } },
   );
-  await channel.send({ content: teamWelcomeText(userId, project.name), allowedMentions: { users: [userId] } });
+  await channel.send({ content: teamWelcomeText(userId, project.name, guideChannelId(guild)), allowedMentions: { users: [userId] } });
   try {
     if (!(await giveClientRole(guild, userId))) log.warn('no Client role to give; run scripts/setup-server.mjs');
   } catch (error) {
@@ -105,7 +110,7 @@ export async function attachClient(
       : { actor: 'owner', actorId: linkedBy, action: 'project.client_linked', outcome: 'ok', data: { how, client_id: clientId } },
     { client_id: clientId },
   );
-  await channel.send(welcomeText(clientId));
+  await channel.send(welcomeText(clientId, guideChannelId(guild)));
   try {
     if (!(await giveClientRole(guild, clientId))) log.warn('no Client role to give; run scripts/setup-server.mjs');
   } catch (error) {

@@ -162,8 +162,10 @@ export class FakeChannel {
       },
       async edit(payload: unknown) {
         const update = toReply('update', payload);
-        message.content = update.content || message.content;
-        if (payload && typeof payload === 'object' && 'components' in payload) message.customIds = update.customIds;
+        const has = (key: string) => typeof payload === 'object' && payload !== null && key in payload;
+        if (typeof payload === 'string' || has('content')) message.content = update.content;
+        if (has('components')) message.customIds = update.customIds;
+        if (has('embeds')) message.embeds = update.embeds;
         return message;
       },
     };
@@ -175,6 +177,7 @@ export class FakeChannel {
     const reply = toReply('reply', payload);
     const message = this.post({ id: this.guild.botId, bot: true, name: 'Freelance Manager Bot' }, reply.content, reply.files);
     message.customIds = reply.customIds;
+    message.embeds = reply.embeds;
     return message;
   }
 

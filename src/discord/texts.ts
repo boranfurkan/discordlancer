@@ -36,15 +36,15 @@ export function clientMentions(project: Pick<Project, 'client_id' | 'client_ids'
 }
 
 /** For someone joining a project their team already has, with a team invite. */
-export function teamWelcomeText(memberId: string, projectName: string): string {
+export function teamWelcomeText(memberId: string, projectName: string, guideId?: string): string {
   return [
     `Welcome, <@${memberId}>! You've joined **${projectName}** with the rest of your team.`,
     `Everyone on your side can talk here, ask about the project with /ask, join calls, and agree specs, quotes and the delivery for your team. Earlier messages are above, and call notes, code changes and progress updates have their own threads.`,
-    'Type /help at any time to see what you can do.',
+    guideId ? `New here? <#${guideId}> explains each step and every command. Type /help at any time to see what you can do now.` : 'Type /help at any time to see what you can do.',
   ].join('\n');
 }
 
-export function welcomeText(clientId: string): string {
+export function welcomeText(clientId: string, guideId?: string): string {
   return [
     `Welcome, <@${clientId}>! This is your private project channel with ${OWNER_NAME}. Only the people on this project and the Discordlancer bot can see it. Need colleagues here too? Ask ${OWNER_NAME} for an invite for each of them.`,
     '',
@@ -59,7 +59,7 @@ export function welcomeText(clientId: string): string {
     '',
     `**Privacy:** the bot keeps a record of this project: the messages here (used to write the specs and answer questions), the commands you run, and payments. That gives you both a clear history. Specs, progress estimates and assistant answers are drafted with AI (Google Gemini) and marked as such; Gemini does not keep them. Progress updates are written by ${OWNER_NAME}'s AI coding assistant (Claude) while he works, and are marked as such too. Calls in the project's voice channel are recorded only if you agree each time (a button): ElevenLabs transcribes them and the bot then asks it to delete its copy; the bot keeps the transcript and a summary, not the audio.`,
     '',
-    'Type /help at any time to see what you can do.',
+    guideId ? `<#${guideId}> explains each step and every command. Type /help at any time to see what you can do now.` : 'Type /help at any time to see what you can do.',
   ].join('\n');
 }
 

@@ -103,6 +103,42 @@ export function ensureGuideChannel(guild: Guild, ownerId: string): Promise<TextC
   return ensurePrivateText(guild, GUIDE_CHANNEL, ownerId, 'How to use Discordlancer: every command and how a project runs. Only you can see this.');
 }
 
+/** The client guide: everyone can read it, only the bot posts. Under "Start here", next to #welcome. */
+export const CLIENT_GUIDE_CHANNEL = 'how-it-works';
+
+export async function ensureClientGuideChannel(guild: Guild): Promise<TextChannel> {
+  const channels = await guild.channels.fetch();
+  const existing = channels.find((channel): channel is TextChannel => channel?.type === ChannelType.GuildText && channel.name === CLIENT_GUIDE_CHANNEL);
+  if (existing) return existing;
+  const start = channels.find((channel): channel is CategoryChannel => channel?.type === ChannelType.GuildCategory && channel.name === 'Start here');
+  return guild.channels.create({
+    name: CLIENT_GUIDE_CHANNEL,
+    type: ChannelType.GuildText,
+    ...(start ? { parent: start.id } : {}),
+    topic: 'How a project works here, and every command you can use in your project channel.',
+    permissionOverwrites: [
+      {
+        id: guild.roles.everyone.id,
+        type: OverwriteType.Role,
+        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
+        deny: [
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.SendMessagesInThreads,
+          PermissionFlagsBits.CreatePublicThreads,
+          PermissionFlagsBits.CreatePrivateThreads,
+          PermissionFlagsBits.AddReactions,
+        ],
+      },
+      {
+        id: botId(guild),
+        type: OverwriteType.Member,
+        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages],
+      },
+    ],
+    reason: 'Discordlancer: the client guide',
+  });
+}
+
 /** A channel only Boran and the bot can see: notices, ambiguous joins, evidence exports. */
 export function ensureOwnerChannel(guild: Guild, ownerId: string): Promise<TextChannel> {
   return ensurePrivateText(guild, OWNER_CHANNEL, ownerId, 'Discordlancer notices for the owner only');
