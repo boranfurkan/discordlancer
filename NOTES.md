@@ -103,6 +103,13 @@ All from `efe_shipyard` in #support unless noted. These override the guide.
 - **Past clients don't count:** "the rules only count sales to new customers."
 - **Wallet declared (9 Nov, 20:15):** Boran told `efe_shipyard` and Shipyard Admin in the team channel that payments go to `FRgRdaRFEiPDe63WdfzJpZWHG1MYJqSZ8SD6i45jGpAG`, which is the bot's `SOLANA_WALLET_ADDRESS` (checked 10 Nov). **Shipyard Admin:** after a payment comes through, send an invoice in that channel; they confirm the payment before adding it to the leaderboard. Keep the invoice and everything else for the records.
 - **Referrals count (`efe_shipyard`, 9 Nov):** an existing client introducing a new client, with no cut, is a stranger sale, as long as the new client is new to us and pays us directly. Log the human parts as touches: the intro ask, calls, sales chats and build sessions. If paid in USDC, declare the wallet before the first payment. Keep the intro message for the audit.
+- **The website client counts (`efe_shipyard`, 12 Nov, 14:38):** a £350 small-business website. The client was found when Boran's brother saw them ask for a website in a group chat; Boran didn't know them, phoned them on 11 Nov, and they paid him directly. £150 was paid by bank transfer on 11 Nov, and bank transfer was declared late, on 12 Nov at 13:51. The ruling:
+  - The lead is fine, and so is the late declaration, "since you flagged it straight away".
+  - The £150 counts as long as the website is delivered before the freeze. The remaining £200 counts when it's paid, also before the freeze.
+  - Keep the bank statement, the client's written confirmation and the receipt for the audit; there's no need to send them now.
+  - Don't post account details in the team channel. Boran's 14:01 attachment (a banking-app screenshot of the £150) was deleted on 12 Nov, as efe suggested.
+- **The agent must do part of every sale (`efe_shipyard`, 12 Nov):** "the agent needs to do at least one part of the sale itself, so finding the customer, selling or delivering." Our agents building the work and reporting to the client covers this. Keep logging calls and messages with clients as touches.
+- **Declared payment sources:** USDC to the wallet above (9 Nov), and bank transfer (12 Nov, late but accepted).
 
 **Credits**
 - Normal partner terms apply. You can exceed credits at your own cost.
