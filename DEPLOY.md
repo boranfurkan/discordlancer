@@ -59,4 +59,5 @@ Push to GitHub, pull the change in Replit, then republish. At startup the bot ap
 - **`Fix the environment: … is missing`:** a Secret is missing or misnamed. The message names it, never its value.
 - **No `discord ready` line:** the Discord token is wrong, or the privileged intents are off. Run `npm run check:env`.
 - **The database close times out on shutdown:** expected with SurrealDB 4. The bot gives up after 3 seconds and exits cleanly.
+- **Every command says "The application did not respond", and the status page says `"status":"degraded"`:** the database is unreachable, so each command waits on it and times out. The logs show `UnexpectedConnectionError`. Check the instance in SurrealDB Cloud (paused, or billing); on 17 Nov 2026 it was billing. The bot reconnects by itself once the database is back; restart it if the status page still says `degraded` a minute later.
 - **Logs:** every line is JSON and has secrets scrubbed. The events in SurrealDB are the record for the audit; the logs are for debugging.

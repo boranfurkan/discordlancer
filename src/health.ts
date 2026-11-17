@@ -1,6 +1,8 @@
 // The bot's web port. A tiny status page, so hosts that check a web port (Replit's
-// Reserved VM) can see the bot is up. It is public, so it says only "ok" and whether
-// Discord is connected: no project names, counts or settings. Extra routes, such as
+// Reserved VM) can see the bot is up. It is public, so it says only "ok" or "degraded",
+// and whether Discord and the database are connected: no project names, counts or settings.
+// It answers 200 even while the database is down: the bot reconnects by itself, and a
+// failing check could make the host restart it in a loop during a database outage. Extra routes, such as
 // /mcp for Claude Code, do their own checks; until one is ready it answers 503.
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
@@ -18,7 +20,12 @@ export function healthPort(value: string | undefined): number {
   return Number.isInteger(port) && port > 0 && port < 65536 ? port : DEFAULT_HEALTH_PORT;
 }
 
-export function startHealthServer(port: number, isReady: () => boolean, routes: Routes = {}): Server {
+export function startHealthServer(
+  port: number,
+  isReady: () => boolean,
+  routes: Routes = {},
+  databaseStatus?: () => string | undefined,
+): Server {
   const server = createServer((request, response) => {
     const path = (request.url ?? '/').split('?')[0] ?? '/';
     if (Object.hasOwn(routes, path)) {
@@ -36,7 +43,12 @@ export function startHealthServer(port: number, isReady: () => boolean, routes: 
       return;
     }
     if ((request.method === 'GET' || request.method === 'HEAD') && (path === '/' || path === '/health')) {
-      const body = JSON.stringify({ status: 'ok', discord: isReady() ? 'connected' : 'starting' });
+      const database = databaseStatus ? (databaseStatus() ?? 'starting') : undefined;
+      const body = JSON.stringify({
+        status: database === undefined || database === 'connected' ? 'ok' : 'degraded',
+        discord: isReady() ? 'connected' : 'starting',
+        ...(database === undefined ? {} : { database }),
+      });
       response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
       response.end(request.method === 'HEAD' ? undefined : body);
       return;

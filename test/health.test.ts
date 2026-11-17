@@ -36,6 +36,21 @@ describe('status page', () => {
     expect(await (await fetch(base)).json()).toEqual({ status: 'ok', discord: 'starting' });
   });
 
+  it('says when the database is unreachable, and still answers 200', async () => {
+    let status: string | undefined;
+    const server = startHealthServer(0, () => true, {}, () => status);
+    close = () => server.close();
+    await new Promise<void>((resolve) => server.once('listening', resolve));
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    expect(await (await fetch(base)).json()).toEqual({ status: 'degraded', discord: 'connected', database: 'starting' });
+    status = 'connected';
+    expect(await (await fetch(base)).json()).toEqual({ status: 'ok', discord: 'connected', database: 'connected' });
+    status = 'reconnecting';
+    const response = await fetch(base);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'degraded', discord: 'connected', database: 'reconnecting' });
+  });
+
   it('serves nothing else', async () => {
     const base = await start(true);
     expect((await fetch(`${base}/projects`)).status).toBe(404);

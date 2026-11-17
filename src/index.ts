@@ -45,9 +45,12 @@ async function main(): Promise<void> {
   // Opened first, so the host sees the app is up while the rest starts.
   const client = createDiscordClient();
   let mcp: RouteHandler | undefined;
-  const health = startHealthServer(healthPort(process.env.PORT), () => client.isReady(), { [MCP_PATH]: () => mcp });
+  // Set once connected; until then the status page says the database is starting.
+  let database: Awaited<ReturnType<typeof connectDatabase>> | undefined;
+  const health = startHealthServer(healthPort(process.env.PORT), () => client.isReady(), { [MCP_PATH]: () => mcp }, () => database?.status);
 
   const db = await connectDatabase(env);
+  database = db;
   await applySchema(db);
   await registerCommands(env, COMMANDS);
 
