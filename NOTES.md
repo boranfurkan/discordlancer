@@ -1,6 +1,6 @@
 # Make Me Money (Shipyard) — Notes
 
-Organised digest of everything we've read. Raw material is in `sources/`. Last updated 9 Nov 2026. Rulings about in-person shop selling and Google Maps date from the earlier idea and are kept for the record.
+Organised digest of everything we've read. Raw material is in `sources/`, kept locally and out of the repo, since it copies the hackathon's own Discord channels and guide. Last updated 9 Nov 2026. Rulings about in-person shop selling and Google Maps date from the earlier idea and are kept for the record.
 
 **Sources read so far**
 - [x] Participant Guide PDF (`sources/participant-guide.pdf`, text in `.txt`). Refs like p.8 point here
